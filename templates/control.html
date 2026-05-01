@@ -432,6 +432,7 @@
               onmouseleave="heldButton=null"
               ontouchstart="heldButton='forward'"
               ontouchend="heldButton=null"
+              ontouchcancel="heldButton=null"
             >
               ⬆ Forward
             </button>
@@ -442,6 +443,7 @@
               onmouseleave="heldButton=null"
               ontouchstart="heldButton='left'"
               ontouchend="heldButton=null"
+              ontouchcancel="heldButton=null"
             >
               ⬅ Left
             </button>
@@ -458,6 +460,7 @@
               onmouseleave="heldButton=null"
               ontouchstart="heldButton='right'"
               ontouchend="heldButton=null"
+              ontouchcancel="heldButton=null"
             >
               Right ➡
             </button>
@@ -468,6 +471,7 @@
               onmouseleave="heldButton=null"
               ontouchstart="heldButton='backward'"
               ontouchend="heldButton=null"
+              ontouchcancel="heldButton=null"
             >
               ⬇ Backward
             </button>
@@ -548,8 +552,8 @@
         }
       }, 100);  // Send every 100ms while held (10 Hz)
 
-      // Detect button release (including when mouse leaves button)
-      document.addEventListener('mouseup', () => {
+      // Detect button release (including when mouse leaves button or touch ends)
+      const handleButtonRelease = () => {
         if (heldButton) {
           console.log(`[RELEASE] Button was held: ${heldButton} | Sending STOP...`);
           heldButton = null;
@@ -557,7 +561,10 @@
             executeCommand('stop');
           }
         }
-      });
+      };
+      document.addEventListener('mouseup', handleButtonRelease);
+      document.addEventListener('touchend', handleButtonRelease);
+      document.addEventListener('touchcancel', handleButtonRelease);
 
       function updateStatus() {
         fetch('/api/status')
@@ -684,8 +691,6 @@
           body: JSON.stringify({ mode: mode }),
         }).catch((error) => console.error('Error setting mode:', error));
       }
-
-      let isDryRun = false;
 
       function toggleDryRun() {
         isDryRun = !isDryRun;

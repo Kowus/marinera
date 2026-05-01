@@ -428,6 +428,13 @@ def send_command():
     action = data.get('action')
     speed = data.get('speed', 50)
     
+    # Validate action
+    if not action:
+        return jsonify({'status': 'error', 'message': 'Missing action parameter'}), 400
+    
+    # Clamp speed to valid range
+    speed = max(0, min(100, int(speed)))
+    
     with state_lock:
         control_state['speed'] = speed
     
