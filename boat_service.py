@@ -86,7 +86,8 @@ motor_state = {
 control_state = {
     'mode': 'MANUAL',          # MANUAL or AUTONOMOUS
     'speed': 50,               # 0-100%
-    'enabled': False           # System armed?
+    'enabled': False,          # System armed?
+    'dry_run': False           # Dry run mode (no serial, just log)
 }
 
 motor_queue = Queue()          # Commands from web interface
@@ -95,18 +96,34 @@ motor_serial = None
 # ============================================================================
 # Motor Command Sender
 # ============================================================================
-def send_motor_command(command):
-    """Send command to Arduino motor controller"""
+def send_motor_command(command, dry_run=False):
+    """Send command to Arduino motor controller (or simulate in dry-run)"""
     global motor_serial
     
+    # Always update state for display
+    with motor_lock:
+        motor_state['last_command'] = command
+        motor_state['timestamp'] = time.time()
+    
+    # Parse command for logging
+    direction_map = {'M0': 'Forward', 'M1': 'Backward', 'T0': 'Left', 'T1': 'Right', 'S': 'Stop'}
+    prefix = command[:2]
+    direction = direction_map.get(prefix, 'Unknown')
+    pwm = command[2:] if len(command) > 2 else 'N/A'
+    
+    # Log the command
+    if dry_run:
+        print(f"[DRY RUN] {direction:10} | PWM: {pwm:5} | Full: {command}")
+        return True
+    
+    # Send to Arduino
     if motor_serial is None or not motor_serial.is_open:
+        print(f"[MOTOR Error] No serial connection. Command would be: {direction} (PWM: {pwm})")
         return False
     
     try:
         motor_serial.write(f"{command}\n".encode('utf-8'))
-        with motor_lock:
-            motor_state['last_command'] = command
-            motor_state['timestamp'] = time.time()
+        print(f"[MOTOR] {direction:10} | PWM: {pwm:5} | Full: {command}")
         return True
     except Exception as e:
         print(f"[MOTOR Error] Failed to send command: {e}")
@@ -273,13 +290,14 @@ def control_loop():
                 with state_lock:
                     mode = control_state['mode']
                     enabled = control_state['enabled']
+                    dry_run = control_state['dry_run']
                 
                 # Only execute commands if system is armed
                 if not enabled:
                     motor_command = 'S00000'
                 
-                # Send command to motor
-                send_motor_command(motor_command)
+                # Send command to motor (with dry-run support)
+                send_motor_command(motor_command, dry_run=dry_run)
                 
                 # Get latest sensor data
                 with gps_lock:
@@ -373,6 +391,7 @@ def get_status():
         mode = control_state['mode']
         speed = control_state['speed']
         enabled = control_state['enabled']
+        dry_run = control_state['dry_run']
     
     return jsonify({
         'gps': {
@@ -389,7 +408,8 @@ def get_status():
         'motor_command': last_cmd,
         'mode': mode,
         'speed': speed,
-        'enabled': enabled
+        'enabled': enabled,
+        'dry_run': dry_run
     })
 
 @app.route('/api/command', methods=['POST'])
@@ -436,13 +456,15 @@ def arm_system():
     armed = data.get('armed', False)
     
     with state_lock:
+        is_dry_run = control_state['dry_run']
         control_state['enabled'] = armed
     
     if armed:
         # Send reset command to Arduino
-        send_motor_command('R000')
-        print("[SYSTEM] Armed - reset command sent to Arduino")
-        return jsonify({'status': 'ok', 'message': 'System armed'})
+        send_motor_command('R000', dry_run=is_dry_run)
+        status_msg = "[DRY RUN] Armed" if is_dry_run else "[SYSTEM] Armed - reset command sent to Arduino"
+        print(status_msg)
+        return jsonify({'status': 'ok', 'message': 'System armed', 'dry_run': is_dry_run})
     else:
         # Send stop command
         motor_queue.put('S00000')
@@ -465,6 +487,21 @@ def set_mode():
     
     print(f"[MODE] Switched to {mode}")
     return jsonify({'status': 'ok', 'mode': mode})
+
+@app.route('/api/dry-run', methods=['POST'])
+def set_dry_run():
+    """Toggle dry-run mode (simulates commands without sending to serial)"""
+    global control_state
+    
+    data = request.json
+    enabled = data.get('enabled', False)
+    
+    with state_lock:
+        control_state['dry_run'] = enabled
+    
+    status = "ENABLED" if enabled else "DISABLED"
+    print(f"[DRY RUN] {status} - Commands will NOT be sent to Arduino")
+    return jsonify({'status': 'ok', 'dry_run': enabled, 'message': f"Dry run {status}"})
 
 # ============================================================================
 # Motor Connection Setup
@@ -521,7 +558,10 @@ if __name__ == "__main__":
     print(f"Access at: http://<jetson-ip>:5000")
     print("Default on local network: http://localhost:5000")
     print()
-    print("Remove the motor loop stopping the service with Ctrl+C")
+    print("💡 TIP: Toggle 'Dry Run' in web interface to test commands")
+    print("   without sending to Arduino (perfect for pre-flight checks)")
+    print()
+    print("Press Ctrl+C to stop")
     print("="*60)
     print()
     

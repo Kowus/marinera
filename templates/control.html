@@ -413,6 +413,12 @@
               oninput="updateSpeed(this.value)"
             />
           </div>
+
+          <div class="mode-toggle" style="margin-top: 20px;">
+            <button class="mode-btn" id="dry-run-btn" onclick="toggleDryRun()" style="background: #ffc107; border-color: #ffc107; color: #333; font-weight: 600;">
+              🧪 Dry Run: OFF
+            </button>
+          </div>
         </div>
 
         <!-- Manual Control -->
@@ -554,6 +560,7 @@
 
             // Update arm status
             isArmed = data.enabled;
+            isDryRun = data.dry_run;
             updateArmDisplay();
           })
           .catch((error) => console.error('Error updating status:', error));
@@ -647,6 +654,37 @@
           },
           body: JSON.stringify({ mode: mode }),
         }).catch((error) => console.error('Error setting mode:', error));
+      }
+
+      let isDryRun = false;
+
+      function toggleDryRun() {
+        isDryRun = !isDryRun;
+        const btn = document.getElementById('dry-run-btn');
+        
+        fetch('/api/dry-run', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ enabled: isDryRun }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            const status = isDryRun ? 'ON' : 'OFF';
+            btn.textContent = `🧪 Dry Run: ${status}`;
+            if (isDryRun) {
+              btn.style.background = '#28a745';
+              btn.style.borderColor = '#28a745';
+              btn.style.color = 'white';
+            } else {
+              btn.style.background = '#ffc107';
+              btn.style.borderColor = '#ffc107';
+              btn.style.color = '#333';
+            }
+            console.log('Dry run mode ' + status);
+          })
+          .catch((error) => console.error('Error toggling dry run:', error));
       }
 
       // Initial status update
