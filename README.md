@@ -127,6 +127,21 @@ pip install -r requirements.txt
 
 ### On Jetson Nano
 
+**Before running, verify your serial port assignments:**
+
+```bash
+ls /dev/tty*
+```
+
+You'll typically see:
+
+- `/dev/ttyACM0` - GPS module (appears as ACM even though connected via USB)
+- `/dev/ttyUSB0` - Arduino (USB-to-serial adapter)
+
+Update `GPS_PORT` and `MOTOR_PORT` in `boat_controller.py` if your system differs.
+
+Then run:
+
 ```bash
 cd ~/boat_control
 pip install -r requirements.txt
@@ -225,12 +240,32 @@ When adding image recognition:
 3. Main loop checks vision data and adjusts motor commands accordingly
 4. Log vision detections alongside GPS/IMU data
 
+## Known Issues
+
+### GPS Antenna Performance by Region
+
+The Neo 7M GPS module's built-in antenna has limited range and may struggle in certain regions. **Users in regions far from the equator or with challenging RF environments (e.g., West Africa, high latitudes) may experience weak or no satellite lock.**
+
+**Example:** Testing in Ghana required an external GPS antenna for reliable signal acquisition. Without it, the module would fail to lock or maintain fix.
+
+**Solution: Use an Active Antenna**
+
+- **Strongly recommended:** Purchase an active (powered) GPS antenna instead of passive
+- With active antenna: Lock time reduced to **~5 seconds max**, even when lying flat on the boat
+- Active antennas have built-in low-noise amplifiers, significantly improving sensitivity
+- Position the antenna with clear sky view (away from buildings, trees, water)
+- Ensure your power supply can handle the additional current draw (~30mA typical)
+- Test antenna performance before deploying the full system
+
 ## Troubleshooting
 
 **No GPS data?**
 
 - Check Neo 7M is getting power and has serial connection
-- Verify `/dev/ttyUSB1` is correct port (use `ls /dev/ttyUSB*`)
+- **Verify the GPS port:** Run `ls /dev/tty*` and confirm GPS appears on `/dev/ttyACM0` (or note its actual port)
+  - GPS modules typically appear as `/dev/ttyACM0` even when connected via USB
+  - Update `GPS_PORT` in `boat_controller.py` if needed
+- **Regional note:** In areas with poor satellite coverage (equatorial/high latitude regions), consider using an external GPS antenna
 
 **Motors not responding?**
 

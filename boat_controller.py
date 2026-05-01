@@ -43,7 +43,7 @@ ACCEL_WEIGHT = 0.02          # How much to trust accel-estimated heading
 # Serial/I2C ports
 MOTOR_PORT = "/dev/ttyUSB0"  # Arduino motor controller
 MOTOR_BAUD = 115200          # Arduino serial speed
-GPS_PORT = "/dev/ttyUSB1"    # Neo 7M GPS
+GPS_PORT = "/dev/ttyACM0"    # Neo 7M GPS (check your system with: ls /dev/tty* before running)
 MPU_ADDRESS = 0x68           # MPU6050 I2C address
 
 # Logging
