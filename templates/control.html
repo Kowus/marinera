@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marinera - Boat Control</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 2.5em;
+        margin-bottom: 5px;
+      }
+
+      .header p {
+        font-size: 0.9em;
+        opacity: 0.9;
+      }
+
+      .content {
+        padding: 30px;
+      }
+
+      .section {
+        margin-bottom: 30px;
+      }
+
+      .section-title {
+        font-size: 1.3em;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #667eea;
+      }
+
+      .control-panel {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .status-box {
+        background: #f8f9fa;
+        border: 2px solid #667eea;
+        border-radius: 10px;
+        padding: 15px;
+      }
+
+      .status-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .status-item:last-child {
+        border-bottom: none;
+      }
+
+      .status-label {
+        font-weight: 600;
+        color: #555;
+      }
+
+      .status-value {
+        color: #667eea;
+        font-weight: 700;
+      }
+
+      .arm-section {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .mode-toggle {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .mode-btn {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid #ddd;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.95em;
+        font-weight: 600;
+        transition: all 0.3s;
+      }
+
+      .mode-btn.active {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+      }
+
+      .mode-btn:hover {
+        border-color: #667eea;
+      }
+
+      .arm-btn,
+      .disarm-btn {
+        padding: 15px 30px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 600;
+        transition: all 0.3s;
+        flex: 1;
+      }
+
+      .arm-btn {
+        background: #28a745;
+        color: white;
+      }
+
+      .arm-btn:hover {
+        background: #218838;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+      }
+
+      .disarm-btn {
+        background: #dc3545;
+        color: white;
+      }
+
+      .disarm-btn:hover {
+        background: #c82333;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+      }
+
+      .arm-status {
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-align: center;
+        min-width: 150px;
+      }
+
+      .arm-status.armed {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .arm-status.disarmed {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .speed-control {
+        margin: 20px 0;
+      }
+
+      .speed-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      input[type='range'] {
+        width: 100%;
+        height: 8px;
+        border-radius: 5px;
+        background: #ddd;
+        outline: none;
+        -webkit-appearance: none;
+      }
+
+      input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #667eea;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(102, 126, 234, 0.4);
+      }
+
+      input[type='range']::-moz-range-thumb {
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #667eea;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 5px rgba(102, 126, 234, 0.4);
+      }
+
+      .joystick-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        max-width: 300px;
+        margin: 20px auto;
+      }
+
+      .joystick-btn {
+        padding: 20px;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.9em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: white;
+      }
+
+      .joystick-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+
+      .joystick-btn:active {
+        transform: scale(0.98);
+      }
+
+      .btn-forward,
+      .btn-backward {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        grid-column: 2;
+      }
+
+      .btn-forward {
+        grid-row: 1;
+      }
+
+      .btn-backward {
+        grid-row: 3;
+      }
+
+      .btn-left {
+        background: #ff6b6b;
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .btn-right {
+        background: #4ecdc4;
+        grid-column: 3;
+        grid-row: 2;
+      }
+
+      .btn-stop {
+        background: #e74c3c;
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      .sensor-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+
+      .sensor-card {
+        background: #f8f9fa;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 15px;
+      }
+
+      .sensor-card h3 {
+        font-size: 0.85em;
+        color: #667eea;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+      }
+
+      .sensor-data {
+        font-size: 1.2em;
+        font-weight: 700;
+        color: #333;
+      }
+
+      .last-command {
+        background: #f8f9fa;
+        border: 2px solid #667eea;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .last-command-label {
+        font-size: 0.85em;
+        color: #667eea;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
+      .last-command-value {
+        font-size: 1.5em;
+        font-weight: 700;
+        color: #333;
+        font-family: 'Courier New', monospace;
+      }
+
+      .footer {
+        background: #f8f9fa;
+        padding: 20px;
+        text-align: center;
+        color: #666;
+        font-size: 0.85em;
+      }
+
+      @media (max-width: 600px) {
+        .control-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .sensor-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .header h1 {
+          font-size: 1.8em;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🌊 Marinera</h1>
+        <p>Autonomous Boat Control System</p>
+      </div>
+
+      <div class="content">
+        <!-- System Control -->
+        <div class="section">
+          <div class="section-title">System Control</div>
+
+          <div class="mode-toggle">
+            <button
+              class="mode-btn active"
+              id="manual-mode"
+              onclick="setMode('MANUAL')"
+            >
+              🎮 Manual Mode
+            </button>
+            <button
+              class="mode-btn"
+              id="autonomous-mode"
+              onclick="setMode('AUTONOMOUS')"
+            >
+              🗺️ Autonomous (Coming Soon)
+            </button>
+          </div>
+
+          <div class="arm-section">
+            <button class="arm-btn" id="arm-btn" onclick="armSystem()">
+              Arm
+            </button>
+            <button class="disarm-btn" id="disarm-btn" onclick="disarmSystem()">
+              Disarm
+            </button>
+            <div class="arm-status disarmed" id="arm-status">Disarmed</div>
+          </div>
+
+          <div class="speed-control">
+            <div class="speed-label">
+              <span>Speed Control</span>
+              <span id="speed-value">50%</span>
+            </div>
+            <input
+              type="range"
+              id="speed-slider"
+              min="0"
+              max="100"
+              value="50"
+              oninput="updateSpeed(this.value)"
+            />
+          </div>
+        </div>
+
+        <!-- Manual Control -->
+        <div class="section">
+          <div class="section-title">Manual Control</div>
+          <div class="joystick-grid">
+            <button
+              class="joystick-btn btn-forward"
+              onmousedown="executeCommand('forward')"
+              onmouseup="executeCommand('stop')"
+              ontouchstart="executeCommand('forward')"
+              ontouchend="executeCommand('stop')"
+            >
+              ⬆ Forward
+            </button>
+            <button
+              class="joystick-btn btn-left"
+              onmousedown="executeCommand('left')"
+              onmouseup="executeCommand('stop')"
+              ontouchstart="executeCommand('left')"
+              ontouchend="executeCommand('stop')"
+            >
+              ⬅ Left
+            </button>
+            <button
+              class="joystick-btn btn-stop"
+              onclick="executeCommand('stop')"
+            >
+              ⏹ Stop
+            </button>
+            <button
+              class="joystick-btn btn-right"
+              onmousedown="executeCommand('right')"
+              onmouseup="executeCommand('stop')"
+              ontouchstart="executeCommand('right')"
+              ontouchend="executeCommand('stop')"
+            >
+              Right ➡
+            </button>
+            <button
+              class="joystick-btn btn-backward"
+              onmousedown="executeCommand('backward')"
+              onmouseup="executeCommand('stop')"
+              ontouchstart="executeCommand('backward')"
+              ontouchend="executeCommand('stop')"
+            >
+              ⬇ Backward
+            </button>
+          </div>
+        </div>
+
+        <!-- Status Display -->
+        <div class="section">
+          <div class="section-title">Live Status</div>
+
+          <div class="control-panel">
+            <div>
+              <h3 style="color: #667eea; font-weight: 600; margin-bottom: 10px">
+                GPS Data
+              </h3>
+              <div class="status-box">
+                <div class="status-item">
+                  <span class="status-label">Latitude</span>
+                  <span class="status-value" id="gps-lat">0.0000</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Longitude</span>
+                  <span class="status-value" id="gps-lon">0.0000</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">GPS Heading</span>
+                  <span class="status-value" id="gps-heading">0.0°</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 style="color: #667eea; font-weight: 600; margin-bottom: 10px">
+                Boat Orientation
+              </h3>
+              <div class="status-box">
+                <div class="status-item">
+                  <span class="status-label">Heading (Fused)</span>
+                  <span class="status-value" id="boat-heading">0.0°</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Pitch</span>
+                  <span class="status-value" id="boat-pitch">0.0°</span>
+                </div>
+                <div class="status-item">
+                  <span class="status-label">Roll</span>
+                  <span class="status-value" id="boat-roll">0.0°</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="last-command">
+            <div class="last-command-label">Last Motor Command</div>
+            <div class="last-command-value" id="last-command">S00000</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">Status updates every 500ms | Boat Service v1.0</div>
+    </div>
+
+    <script>
+      let currentMode = 'MANUAL';
+      let currentSpeed = 50;
+      let isArmed = false;
+
+      // Update status every 500ms
+      setInterval(updateStatus, 500);
+
+      function updateStatus() {
+        fetch('/api/status')
+          .then((response) => response.json())
+          .then((data) => {
+            // GPS Data
+            document.getElementById('gps-lat').textContent =
+              data.gps.latitude.toFixed(6);
+            document.getElementById('gps-lon').textContent =
+              data.gps.longitude.toFixed(6);
+            document.getElementById('gps-heading').textContent =
+              data.gps.heading.toFixed(1) + '°';
+
+            // Boat Orientation
+            document.getElementById('boat-heading').textContent =
+              data.heading.toFixed(1) + '°';
+            document.getElementById('boat-pitch').textContent =
+              data.imu.pitch.toFixed(1) + '°';
+            document.getElementById('boat-roll').textContent =
+              data.imu.roll.toFixed(1) + '°';
+
+            // Motor Command
+            document.getElementById('last-command').textContent =
+              data.motor_command;
+
+            // Update arm status
+            isArmed = data.enabled;
+            updateArmDisplay();
+          })
+          .catch((error) => console.error('Error updating status:', error));
+      }
+
+      function executeCommand(action) {
+        if (!isArmed && action !== 'stop') {
+          console.log('System not armed');
+          return;
+        }
+
+        fetch('/api/command', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: action,
+            speed: currentSpeed,
+          }),
+        }).catch((error) => console.error('Error sending command:', error));
+      }
+
+      function updateSpeed(value) {
+        currentSpeed = parseInt(value);
+        document.getElementById('speed-value').textContent = currentSpeed + '%';
+      }
+
+      function armSystem() {
+        fetch('/api/arm', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ armed: true }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            isArmed = true;
+            updateArmDisplay();
+            alert('System Armed! 🚀');
+          })
+          .catch((error) => console.error('Error arming system:', error));
+      }
+
+      function disarmSystem() {
+        fetch('/api/arm', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ armed: false }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            isArmed = false;
+            updateArmDisplay();
+          })
+          .catch((error) => console.error('Error disarming system:', error));
+      }
+
+      function updateArmDisplay() {
+        const statusDiv = document.getElementById('arm-status');
+        if (isArmed) {
+          statusDiv.textContent = '✓ Armed';
+          statusDiv.classList.remove('disarmed');
+          statusDiv.classList.add('armed');
+        } else {
+          statusDiv.textContent = '✕ Disarmed';
+          statusDiv.classList.remove('armed');
+          statusDiv.classList.add('disarmed');
+        }
+      }
+
+      function setMode(mode) {
+        if (mode === 'AUTONOMOUS') {
+          alert('Autonomous mode coming soon! 🚀');
+          return;
+        }
+
+        currentMode = mode;
+
+        // Update button styling
+        document.getElementById('manual-mode').classList.add('active');
+        document.getElementById('autonomous-mode').classList.remove('active');
+
+        fetch('/api/mode', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ mode: mode }),
+        }).catch((error) => console.error('Error setting mode:', error));
+      }
+
+      // Initial status update
+      updateStatus();
+    </script>
+  </body>
+</html>

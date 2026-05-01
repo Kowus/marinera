@@ -116,7 +116,7 @@ When `ENABLE_REVERSAL = False`:
 - Only forward (M0), turns (T0/T1), and stop (S) are used
 - The boat can still correct orientation via differential turning
 
-## Installation
+## Installation & Running
 
 ### Requirements
 
@@ -138,15 +138,53 @@ You'll typically see:
 - `/dev/ttyACM0` - GPS module (appears as ACM even though connected via USB)
 - `/dev/ttyUSB0` - Arduino (USB-to-serial adapter)
 
-Update `GPS_PORT` and `MOTOR_PORT` in `boat_controller.py` if your system differs.
+Update `GPS_PORT` and `MOTOR_PORT` in `boat_service.py` if your system differs.
 
-Then run:
+### Launch the Web Service
 
 ```bash
 cd ~/boat_control
 pip install -r requirements.txt
-python3 boat_controller.py
+python3 boat_service.py
 ```
+
+Once running, access the web interface from any device on the same network:
+
+```
+http://<jetson-ip>:5000
+```
+
+Or locally on the Jetson:
+
+```
+http://localhost:5000
+```
+
+### Web Interface Features
+
+**Manual Control Mode (Default):**
+
+- 🎮 Quick-access buttons: Forward, Back, Left, Right, Stop
+- 🎚️ Speed slider (0-100%)
+- 🔓 Arm/Disarm system before sending commands
+- 📊 Live sensor display: GPS, heading, pitch/roll
+- 🔄 Real-time motor command feedback
+
+**Controls:**
+
+- Hold forward/back/left/right buttons to move (release to stop)
+- Adjust speed slider before sending commands
+- View current GPS position and boat orientation
+- Monitor last command sent to Arduino
+
+### Autonomous Mode (Future)
+
+Once implemented, switch from the web interface to unlock:
+
+- 🗺️ Waypoint mission planning
+- 📍 GPS navigation with heading correction
+- 📊 Live mission status tracking
+- 💾 Mission history and logs
 
 ## Configuration (Edit Top of `boat_controller.py`)
 
@@ -201,9 +239,20 @@ boat_bypass_t1/
 │                               # - Ultra-simple: parse serial commands, output PWM
 │                               # - No sensor processing, no complex logic
 │
-├── boat_controller.py          # Jetson main controller script
-│                               # - All heavy lifting here
-│                               # - GPS parsing, IMU fusion, error correction, logging
+├── boat_service.py             # Jetson main unified service
+│                               # - Flask web server (localhost:5000)
+│                               # - Manual + Autonomous control (mode toggle)
+│                               # - GPS parsing, IMU fusion, error correction
+│                               # - CSV logging, real-time dashboard
+│
+├── templates/
+│   └── control.html            # Web interface (served by Flask)
+│                               # - Control buttons, speed slider
+│                               # - Live sensor display
+│                               # - Arm/disarm & mode switching
+│
+├── boat_controller.py          # (Legacy) Autonomous-only controller
+│                               # - Use boat_service.py instead
 │
 ├── requirements.txt            # Python dependencies
 ├── SerialParser.h              # (Arduino auxiliary header)
