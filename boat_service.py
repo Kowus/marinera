@@ -282,22 +282,29 @@ def control_loop():
                 current_time = cycle_start
                 
                 # Check for new commands from web interface
-                motor_command = 'S00000'  # Default: stop
+                motor_command = None  # Don't default to stop - only send real commands
                 
                 if not motor_queue.empty():
                     motor_command = motor_queue.get()
+                    # Debug: log what we actually received
+                    print(f"[QUEUE] Received: {repr(motor_command)} (type: {type(motor_command).__name__})")
                 
                 with state_lock:
                     mode = control_state['mode']
                     enabled = control_state['enabled']
                     dry_run = control_state['dry_run']
                 
-                # Only execute commands if system is armed
-                if not enabled:
-                    motor_command = 'S00000'
-                
-                # Send command to motor (with dry-run support)
-                send_motor_command(motor_command, dry_run=dry_run)
+                # Validate command before sending
+                if motor_command:
+                    # Only send valid motor commands (M0, M1, T0, T1, S, R)
+                    if isinstance(motor_command, str) and motor_command and motor_command[0] in ['M', 'T', 'S', 'R']:
+                        if enabled:
+                            send_motor_command(motor_command, dry_run=dry_run)
+                        elif motor_command.startswith('S'):
+                            # Allow stop commands even when disarmed
+                            send_motor_command(motor_command, dry_run=dry_run)
+                    else:
+                        print(f"[QUEUE] Invalid command ignored: {repr(motor_command)}")
                 
                 # Get latest sensor data
                 with gps_lock:

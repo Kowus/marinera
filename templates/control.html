@@ -427,19 +427,21 @@
           <div class="joystick-grid">
             <button
               class="joystick-btn btn-forward"
-              onmousedown="executeCommand('forward')"
-              onmouseup="executeCommand('stop')"
-              ontouchstart="executeCommand('forward')"
-              ontouchend="executeCommand('stop')"
+              onmousedown="heldButton='forward'"
+              onmouseup="heldButton=null"
+              onmouseleave="heldButton=null"
+              ontouchstart="heldButton='forward'"
+              ontouchend="heldButton=null"
             >
               ⬆ Forward
             </button>
             <button
               class="joystick-btn btn-left"
-              onmousedown="executeCommand('left')"
-              onmouseup="executeCommand('stop')"
-              ontouchstart="executeCommand('left')"
-              ontouchend="executeCommand('stop')"
+              onmousedown="heldButton='left'"
+              onmouseup="heldButton=null"
+              onmouseleave="heldButton=null"
+              ontouchstart="heldButton='left'"
+              ontouchend="heldButton=null"
             >
               ⬅ Left
             </button>
@@ -451,19 +453,21 @@
             </button>
             <button
               class="joystick-btn btn-right"
-              onmousedown="executeCommand('right')"
-              onmouseup="executeCommand('stop')"
-              ontouchstart="executeCommand('right')"
-              ontouchend="executeCommand('stop')"
+              onmousedown="heldButton='right'"
+              onmouseup="heldButton=null"
+              onmouseleave="heldButton=null"
+              ontouchstart="heldButton='right'"
+              ontouchend="heldButton=null"
             >
               Right ➡
             </button>
             <button
               class="joystick-btn btn-backward"
-              onmousedown="executeCommand('backward')"
-              onmouseup="executeCommand('stop')"
-              ontouchstart="executeCommand('backward')"
-              ontouchend="executeCommand('stop')"
+              onmousedown="heldButton='backward'"
+              onmouseup="heldButton=null"
+              onmouseleave="heldButton=null"
+              ontouchstart="heldButton='backward'"
+              ontouchend="heldButton=null"
             >
               ⬇ Backward
             </button>
@@ -530,14 +534,38 @@
       let currentMode = 'MANUAL';
       let currentSpeed = 50;
       let isArmed = false;
+      let isDryRun = false;
+      let heldButton = null;  // Track which button is held
 
       // Update status every 500ms
       setInterval(updateStatus, 500);
+
+      // Continuously send held button commands
+      setInterval(() => {
+        if (heldButton && isArmed) {
+          console.log(`[HOLD] Button held: ${heldButton} | Sending command...`);
+          executeCommand(heldButton);
+        }
+      }, 100);  // Send every 100ms while held (10 Hz)
+
+      // Detect button release (including when mouse leaves button)
+      document.addEventListener('mouseup', () => {
+        if (heldButton) {
+          console.log(`[RELEASE] Button was held: ${heldButton} | Sending STOP...`);
+          heldButton = null;
+          if (isArmed) {
+            executeCommand('stop');
+          }
+        }
+      });
 
       function updateStatus() {
         fetch('/api/status')
           .then((response) => response.json())
           .then((data) => {
+            // Debug: log what status we got back
+            console.log(`[STATUS] motor_command="${data.motor_command}" | enabled=${data.enabled}`);
+            
             // GPS Data
             document.getElementById('gps-lat').textContent =
               data.gps.latitude.toFixed(6);
@@ -563,15 +591,13 @@
             isDryRun = data.dry_run;
             updateArmDisplay();
           })
-          .catch((error) => console.error('Error updating status:', error));
+          .catch((error) => console.error('[STATUS] Error updating status:', error));
       }
 
       function executeCommand(action) {
-        if (!isArmed && action !== 'stop') {
-          console.log('System not armed');
-          return;
-        }
-
+        // Debug: log what we're about to send
+        console.log(`[WEB] Sending: action="${action}" | speed=${currentSpeed}% | armed=${isArmed} | heldButton=${heldButton}`);
+        
         fetch('/api/command', {
           method: 'POST',
           headers: {
@@ -581,7 +607,10 @@
             action: action,
             speed: currentSpeed,
           }),
-        }).catch((error) => console.error('Error sending command:', error));
+        })
+          .then(r => r.json())
+          .then(data => console.log(`[WEB] Response:`, data))
+          .catch((error) => console.error('[WEB] Error sending command:', error));
       }
 
       function updateSpeed(value) {
