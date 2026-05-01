@@ -1,0 +1,2 @@
+pyserial>=3.5
+mpu6050-raspberrypi>=1.0
