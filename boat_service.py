@@ -160,6 +160,29 @@ def send_motor_command(command, dry_run=False):
         print(f"[MOTOR Error] Failed to send command: {e}")
         return False
 
+def send_vortex_command(state, dry_run=False):
+    """Send vortex on/off command to Arduino (state: True=ON, False=OFF)"""
+    global motor_serial
+    
+    command = 'V100000' if state else 'V000000'
+    status = 'ON' if state else 'OFF'
+    
+    if dry_run:
+        print(f"[DRY RUN] Vortex: {status:3} | Full: {command}")
+        return True
+    
+    if motor_serial is None or not motor_serial.is_open:
+        print(f"[VORTEX Error] No serial connection. Command would be: {status}")
+        return False
+    
+    try:
+        motor_serial.write(f"{command}\n".encode('utf-8'))
+        print(f"[VORTEX] {status:3} | Full: {command}")
+        return True
+    except Exception as e:
+        print(f"[VORTEX Error] Failed to send command: {e}")
+        return False
+
 # ============================================================================
 # GPS Reader (NMEA parsing)
 # ============================================================================
@@ -509,13 +532,17 @@ def arm_system():
     if armed:
         # Send reset command to Arduino
         send_motor_command('R000', dry_run=is_dry_run)
-        status_msg = "[DRY RUN] Armed" if is_dry_run else "[SYSTEM] Armed - reset command sent to Arduino"
+        # Enable vortex when arming
+        send_vortex_command(True, dry_run=is_dry_run)
+        status_msg = "[DRY RUN] Armed with vortex enabled" if is_dry_run else "[SYSTEM] Armed - reset command sent to Arduino, vortex enabled"
         print(status_msg)
         return jsonify({'status': 'ok', 'message': 'System armed', 'dry_run': is_dry_run})
     else:
         # Send stop command
         motor_queue.put('S00000')
-        print("[SYSTEM] Disarmed")
+        # Disable vortex when disarming
+        send_vortex_command(False, dry_run=is_dry_run)
+        print("[SYSTEM] Disarmed - vortex disabled")
         return jsonify({'status': 'ok', 'message': 'System disarmed'})
 
 @app.route('/api/mode', methods=['POST'])
