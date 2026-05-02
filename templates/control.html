@@ -358,7 +358,21 @@
           font-size: 1.8em;
         }
       }
+
+      #map {
+        width: 100%;
+        height: 400px;
+        border-radius: 10px;
+        margin: 20px 0;
+        border: 2px solid #667eea;
+      }
+
+      .boat-marker {
+        font-size: 24px;
+        filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
+      }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   </head>
   <body>
     <div class="container">
@@ -539,6 +553,11 @@
             <div class="last-command-value" id="last-command">S00000</div>
           </div>
         </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">📍 Boat Location Map</div>
+        <div id="map"></div>
       </div>
 
       <div class="footer">Status updates every 500ms | Boat Service v1.0</div>
@@ -743,6 +762,83 @@
 
       // Initial status update
       updateStatus();
+
+      // ===== LEAFLET MAP INITIALIZATION =====
+      let map = null;
+      let boatMarker = null;
+      let boatHeading = 0;
+
+      // Load Leaflet library and initialize map
+      const leafletScript = document.createElement('script');
+      leafletScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      leafletScript.onload = function() {
+        initializeMap();
+      };
+      document.head.appendChild(leafletScript);
+
+      function initializeMap() {
+        // Create map centered on default coordinates
+        map = L.map('map').setView([0, 0], 13);
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+          minZoom: 2
+        }).addTo(map);
+
+        // Create custom boat marker with arrow
+        const boatIcon = L.divIcon({
+          html: `<div style="font-size: 24px; transform: rotate(${boatHeading}deg); transition: transform 0.3s ease;">⛵</div>`,
+          className: 'boat-marker',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+
+        boatMarker = L.marker([0, 0], { icon: boatIcon }).addTo(map);
+        console.log('[MAP] Leaflet map initialized');
+      }
+
+      // Update map position and boat heading from status
+      function updateMap(lat, lon, heading) {
+        if (!map || !boatMarker) {
+          console.log('[MAP] Map not yet initialized, skipping update');
+          return;
+        }
+
+        // Update marker position
+        boatMarker.setLatLng([lat, lon]);
+
+        // Update heading rotation
+        boatHeading = heading;
+        const markerElement = boatMarker.getElement();
+        if (markerElement) {
+          const arrowDiv = markerElement.querySelector('div');
+          if (arrowDiv) {
+            arrowDiv.style.transform = `rotate(${heading}deg)`;
+          }
+        }
+
+        // Auto-pan map to follow boat (if user hasn't manually panned)
+        // Only center if marker is outside current view
+        if (!map.getBounds().contains([lat, lon])) {
+          map.setView([lat, lon], map.getZoom());
+        }
+      }
+
+      // Hook into existing updateStatus to also update map
+      const originalUpdateStatus = updateStatus;
+      updateStatus = function() {
+        originalUpdateStatus();
+
+        // Also update map after status loads
+        fetch('/api/status')
+          .then((response) => response.json())
+          .then((data) => {
+            updateMap(data.gps.latitude, data.gps.longitude, data.heading);
+          })
+          .catch((error) => console.error('[MAP] Error updating map:', error));
+      };
     </script>
   </body>
 </html>
