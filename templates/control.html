@@ -868,10 +868,18 @@
 
       // ===== SVG COMPASS INITIALIZATION =====
       function updateCompass(heading, lat, lon) {
+        // Ensure values are numbers
+        heading = parseFloat(heading) || 0;
+        lat = parseFloat(lat) || 0;
+        lon = parseFloat(lon) || 0;
+        
+        console.log('[COMPASS] Raw: heading=' + heading + ' (type: ' + typeof heading + '), lat=' + lat + ', lon=' + lon);
+        
         // Update needle rotation
         const needle = document.getElementById('compass-needle');
         if (needle) {
           needle.style.transform = `rotate(${heading}deg)`;
+          console.log('[COMPASS] Needle rotated to ' + heading + 'deg');
         }
         
         // Update heading text
@@ -899,6 +907,8 @@
         fetch('/api/status')
           .then((response) => response.json())
           .then((data) => {
+            console.log('[COMPASS FETCH] Full data:', data);
+            console.log('[COMPASS FETCH] heading=' + data.heading + ', lat=' + data.gps.latitude + ', lon=' + data.gps.longitude);
             updateCompass(data.heading, data.gps.latitude, data.gps.longitude);
             
             // Check reversal capability and disable backward button if needed
