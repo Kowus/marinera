@@ -602,23 +602,25 @@ def camera_reader_thread():
         print("[CAMERA] Initializing GStreamer for CSI camera (CAM1)...")
         Gst.init(None)
         
-        # GStreamer pipeline for Jetson Nano CSI camera with GPU-accelerated JPEG encoding
+        # GStreamer pipeline for Jetson Nano CSI camera with JPEG encoding
         # nvarguscamerasrc: CSI camera source → GPU memory (NV12)
         # nvvidconv: GPU YUV→BGR conversion, stays in GPU memory
-        # nvjpegenc: GPU-accelerated JPEG encoding
+        # videoconvert: Convert from GPU memory (NVMM) back to system memory
+        # jpegenc: Software JPEG encoding (GPU->CPU transfer is the bottleneck)
         # appsink: Capture encoded JPEG bytes for web streaming
-        # (Preview disabled due to tee/format negotiation issues)
         
         pipeline_str = (
             'nvarguscamerasrc ! '
             'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
             'nvvidconv ! '
-            'video/x-raw(memory:NVMM), format=BGRx ! '
-            'nvjpegenc ! '
+            'video/x-raw, format=BGRx ! '
+            'videoconvert ! '
+            'video/x-raw, format=I420 ! '
+            'jpegenc ! '
             'appsink emit-signals=true name=sink'
         )
         
-        print("[CAMERA] Pipeline: nvarguscamerasrc → nvvidconv → nvjpegenc → appsink")
+        print("[CAMERA] Pipeline: nvarguscamerasrc → nvvidconv → videoconvert → jpegenc → appsink")
         
         camera = Gst.parse_launch(pipeline_str)
         if not camera:
