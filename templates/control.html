@@ -359,25 +359,57 @@
         }
       }
 
-      #map {
-        width: 100%;
-        height: 400px;
-        border-radius: 10px;
+      #compass-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
         margin: 20px 0;
-        border: 2px solid #667eea;
       }
 
-      .boat-marker {
+      #compass {
+        width: 300px;
+        height: 300px;
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+      }
+
+      .compass-background {
+        fill: white;
+        stroke: #667eea;
+        stroke-width: 3;
+      }
+
+      .compass-cardinal {
         font-size: 24px;
-        filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
+        font-weight: bold;
+        fill: #667eea;
+        text-anchor: middle;
+        dominant-baseline: middle;
       }
 
-      .boat-arrow {
-        display: inline-block;
-        transition: transform 0.3s ease;
+      .compass-degree {
+        font-size: 11px;
+        fill: #999;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+
+      .compass-needle {
+        transition: transform 0.2s ease-out;
+        transform-origin: 150px 150px;
+      }
+
+      .compass-center {
+        fill: #667eea;
+      }
+
+      .compass-info {
+        font-size: 12px;
+        fill: #333;
+        text-anchor: middle;
+        dominant-baseline: middle;
+        font-family: 'Courier New', monospace;
       }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   </head>
   <body>
     <div class="container">
@@ -561,9 +593,68 @@
         </div>
       </div>
 
-      <div class="section" style="display: none;">
-        <div class="section-title">📍 Boat Location Map</div>
-        <div id="map"></div>
+      <div class="section">
+        <div class="section-title">🧭 Heading Compass</div>
+        <div id="compass-container">
+          <svg id="compass" viewBox="0 0 300 300">
+            <!-- Background circle -->
+            <circle cx="150" cy="150" r="145" class="compass-background"/>
+            
+            <!-- Compass rose rings -->
+            <circle cx="150" cy="150" r="130" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+            <circle cx="150" cy="150" r="115" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+            
+            <!-- Degree markers (every 10 degrees) -->
+            <g id="degree-markers" stroke="#ddd" stroke-width="1">
+              <line x1="150" y1="25" x2="150" y2="35"/>
+              <line x1="150" y1="265" x2="150" y2="275"/>
+              <line x1="25" y1="150" x2="35" y2="150"/>
+              <line x1="265" y1="150" x2="275" y2="150"/>
+            </g>
+            
+            <!-- Cardinal directions -->
+            <text x="150" y="45" class="compass-cardinal">N</text>
+            <text x="150" y="270" class="compass-cardinal">S</text>
+            <text x="265" y="155" class="compass-cardinal">E</text>
+            <text x="35" y="155" class="compass-cardinal">W</text>
+            
+            <!-- Intercardinal directions -->
+            <text x="225" y="70" class="compass-cardinal" font-size="16">NE</text>
+            <text x="230" y="235" class="compass-cardinal" font-size="16">SE</text>
+            <text x="70" y="70" class="compass-cardinal" font-size="16">NW</text>
+            <text x="65" y="235" class="compass-cardinal" font-size="16">SW</text>
+            
+            <!-- Degree numbers (every 30 degrees) -->
+            <text x="150" y="50" class="compass-degree">0°</text>
+            <text x="200" y="65" class="compass-degree">30°</text>
+            <text x="235" y="105" class="compass-degree">60°</text>
+            <text x="255" y="150" class="compass-degree">90°</text>
+            <text x="235" y="195" class="compass-degree">120°</text>
+            <text x="200" y="235" class="compass-degree">150°</text>
+            <text x="150" y="255" class="compass-degree">180°</text>
+            <text x="100" y="235" class="compass-degree">210°</text>
+            <text x="65" y="195" class="compass-degree">240°</text>
+            <text x="45" y="150" class="compass-degree">270°</text>
+            <text x="65" y="105" class="compass-degree">300°</text>
+            <text x="100" y="65" class="compass-degree">330°</text>
+            
+            <!-- Boat heading needle -->
+            <g id="compass-needle" class="compass-needle">
+              <!-- Needle shaft -->
+              <line x1="150" y1="150" x2="150" y2="60" stroke="#ff4444" stroke-width="3" stroke-linecap="round"/>
+              <line x1="150" y1="150" x2="150" y2="240" stroke="#ff4444" stroke-width="2" stroke-opacity="0.3" stroke-linecap="round"/>
+              <!-- Needle head -->
+              <polygon points="150,50 145,65 155,65" fill="#ff4444"/>
+            </g>
+            
+            <!-- Center circle -->
+            <circle cx="150" cy="150" r="12" class="compass-center"/>
+            
+            <!-- Info display -->
+            <text x="150" y="148" class="compass-info" id="compass-heading">0°</text>
+            <text x="150" y="165" class="compass-info" id="compass-coords" font-size="10">0.0000, 0.0000</text>
+          </svg>
+        </div>
       </div>
 
       <div class="footer">Status updates every 500ms | Boat Service v1.0</div>
@@ -775,83 +866,40 @@
       // Initial status update
       updateStatus();
 
-      // ===== LEAFLET MAP INITIALIZATION =====
-      let map = null;
-      let boatMarker = null;
-      let boatHeading = 0;
-      let mapInitialized = false;
-
-      // Load Leaflet library and initialize map
-      const leafletScript = document.createElement('script');
-      leafletScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-      leafletScript.onload = function() {
-        initializeMap();
-      };
-      document.head.appendChild(leafletScript);
-
-      function initializeMap() {
-        // Create map centered on default coordinates
-        map = L.map('map').setView([0, 0], 13);
-
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
-          maxZoom: 19,
-          minZoom: 2
-        }).addTo(map);
-
-        // Create custom boat marker
-        const boatIcon = L.divIcon({
-          html: `<div class="boat-arrow" style="transform: rotate(${boatHeading}deg);">⛵</div>`,
-          className: 'boat-marker',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
-        });
-
-        boatMarker = L.marker([0, 0], { icon: boatIcon }).addTo(map);
-        mapInitialized = true;
-        console.log('[MAP] Leaflet map initialized');
+      // ===== SVG COMPASS INITIALIZATION =====
+      function updateCompass(heading, lat, lon) {
+        // Update needle rotation
+        const needle = document.getElementById('compass-needle');
+        if (needle) {
+          needle.style.transform = `rotate(${heading}deg)`;
+        }
+        
+        // Update heading text
+        const headingText = document.getElementById('compass-heading');
+        if (headingText) {
+          headingText.textContent = heading.toFixed(1) + '°';
+        }
+        
+        // Update coordinates display
+        const coordsText = document.getElementById('compass-coords');
+        if (coordsText) {
+          coordsText.textContent = lat.toFixed(4) + ', ' + lon.toFixed(4);
+        }
+        
+        console.log('[COMPASS] Updated: heading=' + heading.toFixed(1) + '°, lat=' + lat.toFixed(6) + ', lon=' + lon.toFixed(6));
       }
 
-      // Update map position and boat heading from status
-      function updateMap(lat, lon, heading) {
-        if (!map || !boatMarker) {
-          console.log('[MAP] Map not yet initialized, skipping update');
-          return;
-        }
-
-        // Update marker position
-        boatMarker.setLatLng([lat, lon]);
-
-        // Update heading rotation
-        boatHeading = heading;
-        const markerElement = boatMarker.getElement();
-        if (markerElement) {
-          const arrowDiv = markerElement.querySelector('div');
-          if (arrowDiv) {
-            arrowDiv.style.transform = `rotate(${heading}deg)`;
-          }
-        }
-
-        // Auto-pan map to follow boat (if user hasn't manually panned)
-        // Only center if marker is outside current view
-        if (!map.getBounds().contains([lat, lon])) {
-          map.setView([lat, lon], map.getZoom());
-        }
-      }
-
-      // Hook also update map and check reversal setting
+      // Hook into existing updateStatus to also update compass
       const originalUpdateStatus = updateStatus;
       let enableReversal = true;
       updateStatus = function() {
         originalUpdateStatus();
 
-        // Also update map after status UI updates
+        // Also update compass after status loads
         fetch('/api/status')
           .then((response) => response.json())
           .then((data) => {
-            console.log('[MAP] Updating with lat=' + data.gps.latitude + ', lon=' + data.gps.longitude + ', heading=' + data.heading);
-            updateMap(data.gps.latitude, data.gps.longitude, data.heading);
+            updateCompass(data.heading, data.gps.latitude, data.gps.longitude);
             
             // Check reversal capability and disable backward button if needed
             enableReversal = data.enable_reversal;
@@ -868,7 +916,7 @@
               }
             }
           })
-          .catch((error) => console.error('[MAP] Error updating map:', error));
+          .catch((error) => console.error('[COMPASS] Error updating compass:', error));
       };
     </script>
   </body>
