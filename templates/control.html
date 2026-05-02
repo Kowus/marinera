@@ -768,11 +768,25 @@
       let boatMarker = null;
       let boatPolyline = null;
       let boatTrack = []; // Store path history
+      let isMapInitialized = false;
 
       function initMap() {
         try {
+          // Prevent duplicate initialization
+          if (isMapInitialized || !document.getElementById('map')) {
+            return;
+          }
+
+          // Check if map already exists in the div
+          const mapContainer = document.getElementById('map');
+          if (mapContainer && mapContainer._leaflet_id) {
+            map = mapContainer._leaflet;
+            return;
+          }
+
           // Create map centered on default coordinates
           map = L.map('map').setView([37.7749, -122.4194], 15);
+          isMapInitialized = true;
 
           // Add OpenStreetMap tiles
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -805,8 +819,14 @@
 
       function updateMap(lat, lon, heading) {
         try {
-          if (!map) {
+          // Initialize map if needed
+          if (!isMapInitialized) {
             initMap();
+            return; // Skip update on first init, next cycle will have data
+          }
+
+          if (!map) {
+            return;
           }
 
           if (boatMarker) {
@@ -828,16 +848,20 @@
           }
 
           // Pan map to boat location (smooth)
-          map.panTo([lat, lon], { animate: true, duration: 0.5 });
+          if (map.getBounds().contains([lat, lon]) === false) {
+            map.panTo([lat, lon], { animate: true, duration: 0.5 });
+          }
         } catch (error) {
-          console.error('Error updating map:', error);
+          // Silently ignore errors on map updates
         }
       }
 
       // Initialize map on page load
-      window.addEventListener('load', () => {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMap);
+      } else {
         setTimeout(initMap, 100);
-      });
+      }
 
       // Update status every 500ms
       setInterval(updateStatus, 500);
