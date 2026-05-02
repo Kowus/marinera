@@ -51,6 +51,7 @@ CORRECTION_PWM_MIN = 1100    # Min PWM for movement (motors stall below this)
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 CAMERA_PREVIEW = False       # Enable preview window on connected Jetson display (disabled due to pipeline format issues)
+JPEG_QUALITY = 40            # JPEG encoding quality (1-100): lower = faster/more latency, higher = better quality
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 
@@ -616,7 +617,7 @@ def camera_reader_thread():
             'video/x-raw, format=BGRx ! '
             'videoconvert ! '
             'video/x-raw, format=I420 ! '
-            'jpegenc ! '
+            f'jpegenc quality={JPEG_QUALITY} ! '
             'appsink emit-signals=true name=sink'
         )
         
