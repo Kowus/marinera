@@ -50,6 +50,9 @@ MOTOR_PWM_BASE = 1800        # Base forward command
 CORRECTION_PWM_MIN = 1100    # Min PWM for movement (motors stall below this)
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
+CAMERA_PREVIEW = True        # Enable preview window on connected Jetson display (False if headless)
+CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
+ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 
 # Complementary Filter (fuses gyro + accel for robust heading)
 GYRO_WEIGHT = 0.98           # How much to trust gyro integration (vs accel)
@@ -583,8 +586,8 @@ def generate_frames():
 @app.route('/video_feed')
 def video_feed():
     """Stream camera feed as MJPEG"""
-    return (__import__('flask').Response(generate_frames(),
-                                         mimetype='multipart/x-mixed-replace; boundary=frame'),)
+    return __import__('flask').Response(generate_frames(),
+                                        mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def camera_reader_thread():
     """Background thread that captures CSI camera and encodes to JPEG using GStreamer"""
@@ -599,19 +602,36 @@ def camera_reader_thread():
         print("[CAMERA] Initializing GStreamer for CSI camera (CAM1)...")
         Gst.init(None)
         
-        # GStreamer pipeline for Jetson Nano CSI camera with GPU-accelerated JPEG encoding
-        # nvarguscamerasrc: Native Jetson camera source (NV12 in GPU memory)
-        # nvvidconv: GPU-accelerated YUV → BGRx conversion (stays in GPU memory)
-        # jpegenc: GPU-accelerated JPEG encoding (much faster than software)
-        # appsink: Capture encoded JPEG bytes
-        pipeline_str = (
-            'nvarguscamerasrc ! '
-            'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
-            'nvvidconv ! '
-            'video/x-raw(memory:NVMM), format=BGRx ! '
-            'nvjpegenc ! '
-            'appsink emit-signals=true name=sink'
-        )
+        # Build GStreamer pipeline:
+        # nvarguscamerasrc: CSI camera source → GPU memory (NV12)
+        # nvvidconv: GPU YUV→BGRx, stays in GPU memory  
+        # tee: Split pipeline into two branches:
+        #   1. autovideosink: Preview on connected monitor (if CAMERA_PREVIEW=True)
+        #   2. nvjpegenc: GPU JPEG encoding → appsink for web streaming
+        
+        if CAMERA_PREVIEW:
+            # With preview: camera → split → (display + jpeg for streaming)
+            pipeline_str = (
+                'nvarguscamerasrc ! '
+                'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
+                'nvvidconv ! '
+                'video/x-raw(memory:NVMM), format=BGRx ! '
+                'tee name=t ! '
+                  'queue ! autovideosink sync=false '
+                't. ! queue ! nvjpegenc ! appsink emit-signals=true name=sink'
+            )
+        else:
+            # Without preview: camera → jpeg for streaming only
+            pipeline_str = (
+                'nvarguscamerasrc ! '
+                'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
+                'nvvidconv ! '
+                'video/x-raw(memory:NVMM), format=BGRx ! '
+                'nvjpegenc ! '
+                'appsink emit-signals=true name=sink'
+            )
+        
+        print(f"[CAMERA] Pipeline: {('with preview' if CAMERA_PREVIEW else 'no preview')}")
         
         camera = Gst.parse_launch(pipeline_str)
         if not camera:
