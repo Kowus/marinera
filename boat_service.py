@@ -25,14 +25,6 @@ except ImportError:
     GSTREAMER_AVAILABLE = False
     print("[WARNING] GStreamer not available - camera feed will be disabled")
 
-# Try importing OpenCV for image processing
-try:
-    import cv2
-    OPENCV_AVAILABLE = True
-except ImportError:
-    OPENCV_AVAILABLE = False
-    print("[WARNING] OpenCV not available - camera feed will be disabled")
-
 # Try importing MPU6050 - graceful fallback if not available
 try:
     from mpu6050 import mpu6050
@@ -548,25 +540,18 @@ def set_dry_run():
 # ============================================================================
 def generate_frames():
     """Generate MJPEG frames from camera for web streaming"""
-    global camera, camera_frame
-    
-    if not GSTREAMER_AVAILABLE or not OPENCV_AVAILABLE or camera is None:
-        return
+    global camera_frame
     
     while True:
         try:
             with camera_lock:
                 if camera_frame is None:
+                    time.sleep(0.033)
                     continue
                 
-                # Encode frame as JPEG
-                ret, buffer = cv2.imencode('.jpg', camera_frame)
-                if not ret:
-                    continue
-                
-                frame_bytes = buffer.tobytes()
-                
-            # Yield as MJPEG stream
+                frame_bytes = camera_frame
+            
+            # Camera_frame is already JPEG-encoded by GStreamer - send directly
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n'
                    b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
@@ -581,40 +566,37 @@ def generate_frames():
 @app.route('/video_feed')
 def video_feed():
     """Stream camera feed as MJPEG"""
-    if not GSTREAMER_AVAILABLE or not OPENCV_AVAILABLE or camera is None:
-        return "Camera not available - check GStreamer and OpenCV installation", 503
+    if not GSTREAMER_AVAILABLE or camera is None:
+        return "Camera not available - check GStreamer installation", 503
     
     return (__import__('flask').Response(generate_frames(),
                                          mimetype='multipart/x-mixed-replace; boundary=frame'),)
 
 def camera_reader_thread():
-    """Background thread that continuously reads frames from CSI camera using GStreamer"""
+    """Background thread that captures CSI camera and encodes to JPEG using GStreamer"""
     global camera, camera_frame
     
-    if not GSTREAMER_AVAILABLE or not OPENCV_AVAILABLE:
-        print("[CAMERA] GStreamer or OpenCV not available - camera disabled")
-        if not GSTREAMER_AVAILABLE:
-            print("         Install with: sudo apt install python3-gi python3-gi-cairo gir1.2-gstreamer-1.0")
-        if not OPENCV_AVAILABLE:
-            print("         Install with: pip install opencv-python")
+    if not GSTREAMER_AVAILABLE:
+        print("[CAMERA] GStreamer not available - camera disabled")
+        print("         Install with: sudo apt install python3-gi python3-gi-cairo gir1.2-gstreamer-1.0")
         return
     
     try:
         print("[CAMERA] Initializing GStreamer for CSI camera (CAM1)...")
         Gst.init(None)
         
-        # GStreamer pipeline for Jetson Nano CSI camera
-        # nvarguscamerasrc: Native Jetson camera source
-        # nvvidconv: GPU-accelerated video conversion
-        # videoconvert: Convert to BGR for OpenCV
+        # GStreamer pipeline for Jetson Nano CSI camera with GPU-accelerated JPEG encoding
+        # nvarguscamerasrc: Native Jetson camera source (NV12 in GPU memory)
+        # nvvidconv: GPU-accelerated YUV → BGRx conversion (stays in GPU memory)
+        # jpegenc: GPU-accelerated JPEG encoding (much faster than software)
+        # appsink: Capture encoded JPEG bytes
         pipeline_str = (
             'nvarguscamerasrc ! '
             'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
             'nvvidconv ! '
-            'video/x-raw, format=BGRx ! '
-            'videoconvert ! '
-            'video/x-raw, format=BGR ! '
-            'appsink emit-signals=true'
+            'video/x-raw(memory:NVMM), format=BGRx ! '
+            'nvjpegenc ! '
+            'appsink emit-signals=true name=sink'
         )
         
         camera = Gst.parse_launch(pipeline_str)
@@ -622,31 +604,25 @@ def camera_reader_thread():
             print("[CAMERA] Failed to create GStreamer pipeline")
             return
         
-        appsink = camera.get_by_name('appsink0')
+        appsink = camera.get_by_name('sink')
         if not appsink:
             print("[CAMERA] Could not find appsink in pipeline")
             return
         
         def on_new_sample(sink):
-            """Callback when new frame is available from GStreamer"""
+            """Callback when new JPEG frame is available from GStreamer"""
             global camera_frame
             sample = sink.emit('pull-sample')
             if sample:
                 buf = sample.get_buffer()
-                caps = sample.get_caps()
-                struct = caps.get_structure(0)
                 
-                w = struct.get_value('width')
-                h = struct.get_value('height')
-                
-                # Extract frame data
+                # Extract JPEG data directly
                 result, mapinfo = buf.map(Gst.MapFlags.READ)
                 if result:
-                    frame_data = np.frombuffer(mapinfo.data, dtype=np.uint8)
-                    frame_data = frame_data.reshape((h, w, 3))
+                    jpeg_data = bytes(mapinfo.data)
                     
                     with camera_lock:
-                        camera_frame = frame_data.copy()
+                        camera_frame = jpeg_data
                     
                     buf.unmap(mapinfo)
             
@@ -654,8 +630,8 @@ def camera_reader_thread():
         
         appsink.connect('new-sample', on_new_sample)
         
-        print("[CAMERA] Camera initialized (640x480 @ 30 FPS via GStreamer)")
-        print("[CAMERA] GStreamer pipeline: nvarguscamerasrc")
+        print("[CAMERA] Camera initialized (640x480 @ 30 FPS, GPU-encoded JPEG)")
+        print("[CAMERA] GStreamer pipeline: nvarguscamerasrc → nvvidconv → nvjpegenc")
         
         # Start the pipeline
         ret = camera.set_state(Gst.State.PLAYING)
