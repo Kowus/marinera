@@ -869,32 +869,37 @@
       // ===== SVG COMPASS INITIALIZATION =====
       function updateCompass(heading, lat, lon) {
         // Ensure values are numbers
-        heading = parseFloat(heading) || 0;
-        lat = parseFloat(lat) || 0;
-        lon = parseFloat(lon) || 0;
+        heading = Number(heading) || 0;
+        lat = Number(lat) || 0;
+        lon = Number(lon) || 0;
         
-        console.log('[COMPASS] Raw: heading=' + heading + ' (type: ' + typeof heading + '), lat=' + lat + ', lon=' + lon);
+        console.log('[COMPASS] heading=' + heading + ' (type: ' + typeof heading + ', isNaN: ' + isNaN(heading) + ')');
         
         // Update needle rotation
         const needle = document.getElementById('compass-needle');
+        console.log('[COMPASS] needle element:', needle);
         if (needle) {
-          needle.style.transform = `rotate(${heading}deg)`;
-          console.log('[COMPASS] Needle rotated to ' + heading + 'deg');
+          const rotateValue = `rotate(${heading}deg)`;
+          console.log('[COMPASS] Applying transform: ' + rotateValue);
+          needle.style.transform = rotateValue;
+          console.log('[COMPASS] Transform applied. Current style:', needle.style.transform);
+        } else {
+          console.error('[COMPASS] ERROR: compass-needle element not found!');
         }
         
         // Update heading text
         const headingText = document.getElementById('compass-heading');
         if (headingText) {
           headingText.textContent = heading.toFixed(1) + '°';
+          console.log('[COMPASS] Heading text updated to: ' + heading.toFixed(1) + '°');
         }
         
         // Update coordinates display
         const coordsText = document.getElementById('compass-coords');
         if (coordsText) {
           coordsText.textContent = lat.toFixed(4) + ', ' + lon.toFixed(4);
+          console.log('[COMPASS] Coords updated to: ' + lat.toFixed(4) + ', ' + lon.toFixed(4));
         }
-        
-        console.log('[COMPASS] Updated: heading=' + heading.toFixed(1) + '°, lat=' + lat.toFixed(6) + ', lon=' + lon.toFixed(6));
       }
 
       // Hook into existing updateStatus to also update compass
@@ -907,8 +912,8 @@
         fetch('/api/status')
           .then((response) => response.json())
           .then((data) => {
-            console.log('[COMPASS FETCH] Full data:', data);
-            console.log('[COMPASS FETCH] heading=' + data.heading + ', lat=' + data.gps.latitude + ', lon=' + data.gps.longitude);
+            console.log('[COMPASS] Raw API data:', data);
+            console.log('[COMPASS] heading value: ' + data.heading + ' (type: ' + typeof data.heading + ')');
             updateCompass(data.heading, data.gps.latitude, data.gps.longitude);
             
             // Check reversal capability and disable backward button if needed
