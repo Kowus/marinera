@@ -14,6 +14,14 @@ from threading import Thread, Lock
 from flask import Flask, render_template, jsonify, request
 from queue import Queue
 
+# Try importing OpenCV for camera - graceful fallback if not available
+try:
+    import cv2
+    CAMERA_AVAILABLE = True
+except ImportError:
+    CAMERA_AVAILABLE = False
+    print("[WARNING] OpenCV not available - camera feed will be disabled")
+
 # Try importing MPU6050 - graceful fallback if not available
 try:
     from mpu6050 import mpu6050
@@ -92,6 +100,11 @@ control_state = {
 
 motor_queue = Queue()          # Commands from web interface
 motor_serial = None
+
+# Camera feed (MJPEG stream)
+camera = None
+camera_lock = Lock()
+camera_frame = None
 
 # ============================================================================
 # Motor Command Sender
@@ -520,6 +533,90 @@ def set_dry_run():
     return jsonify({'status': 'ok', 'dry_run': enabled, 'message': f"Dry run {status}"})
 
 # ============================================================================
+# Video Feed (MJPEG Camera Stream)
+# ============================================================================
+def generate_frames():
+    """Generate MJPEG frames from camera for web streaming"""
+    global camera, camera_frame
+    
+    if not CAMERA_AVAILABLE or camera is None:
+        return
+    
+    while True:
+        try:
+            with camera_lock:
+                if camera_frame is None:
+                    continue
+                
+                # Encode frame as JPEG
+                ret, buffer = cv2.imencode('.jpg', camera_frame)
+                if not ret:
+                    continue
+                
+                frame_bytes = buffer.tobytes()
+                
+            # Yield as MJPEG stream
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n'
+                   b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
+                   + frame_bytes + b'\r\n')
+            
+            time.sleep(0.033)  # ~30 FPS
+            
+        except Exception as e:
+            print(f"[CAMERA] Frame generation error: {e}")
+            time.sleep(0.1)
+
+@app.route('/video_feed')
+def video_feed():
+    """Stream camera feed as MJPEG"""
+    if not CAMERA_AVAILABLE or camera is None:
+        return "Camera not available", 503
+    
+    return (__import__('flask').Response(generate_frames(),
+                                         mimetype='multipart/x-mixed-replace; boundary=frame'),)
+
+def camera_reader_thread():
+    """Background thread that continuously reads frames from camera"""
+    global camera, camera_frame
+    
+    if not CAMERA_AVAILABLE:
+        print("[CAMERA] OpenCV not available - camera disabled")
+        return
+    
+    try:
+        print("[CAMERA] Initializing camera (device 0)...")
+        camera = cv2.VideoCapture(0)  # Try /dev/video0
+        
+        if not camera.isOpened():
+            print("[CAMERA] Failed to open camera device 0")
+            camera = None
+            return
+        
+        # Set camera properties
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        camera.set(cv2.CAP_PROP_FPS, 30)
+        
+        print("[CAMERA] Camera initialized (640x480 @ 30 FPS)")
+        
+        while True:
+            ret, frame = camera.read()
+            if ret:
+                with camera_lock:
+                    camera_frame = frame
+            else:
+                print("[CAMERA] Failed to read frame")
+                time.sleep(0.1)
+                
+    except Exception as e:
+        print(f"[CAMERA] Error: {e}")
+    finally:
+        if camera:
+            camera.release()
+            print("[CAMERA] Camera released")
+
+# ============================================================================
 # Motor Connection Setup
 # ============================================================================
 def setup_motor_connection():
@@ -558,10 +655,12 @@ if __name__ == "__main__":
     # Start background threads
     gps_thread = Thread(target=read_gps_thread, daemon=True)
     accel_thread = Thread(target=read_accel_thread, daemon=True)
+    camera_thread = Thread(target=camera_reader_thread, daemon=True)
     control_thread = Thread(target=control_loop, daemon=True)
     
     gps_thread.start()
     accel_thread.start()
+    camera_thread.start()
     control_thread.start()
     
     # Give threads time to initialize

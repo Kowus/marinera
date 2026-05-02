@@ -238,7 +238,47 @@
         grid-template-columns: repeat(3, 1fr);
         gap: 10px;
         max-width: 300px;
-        margin: 20px auto;
+      }
+
+      /* Two-column layout for camera + controls */
+      .pilot-view {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin: 20px 0;
+      }
+
+      .camera-feed {
+        background: #000;
+        border-radius: 10px;
+        overflow: hidden;
+        aspect-ratio: 16/9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #667eea;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        min-height: 300px;
+      }
+
+      .camera-feed img,
+      .camera-feed video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .camera-placeholder {
+        color: #999;
+        font-size: 0.9em;
+        text-align: center;
+      }
+
+      .controls-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 15px;
       }
 
       .joystick-btn {
@@ -362,6 +402,15 @@
 
         .header h1 {
           font-size: 1.8em;
+        }
+
+        .pilot-view {
+          grid-template-columns: 1fr;
+          gap: 15px;
+        }
+
+        .camera-feed {
+          min-height: 200px;
         }
       }
 
@@ -540,61 +589,107 @@
           </div>
         </div>
 
-        <!-- Manual Control -->
+        <!-- Manual Control with Camera Feed -->
         <div class="section">
-          <div class="section-title">Manual Control</div>
-          <div class="joystick-grid">
-            <button
-              class="joystick-btn btn-forward"
-              onmousedown="heldButton = 'forward'"
-              onmouseup="heldButton = null"
-              onmouseleave="heldButton = null"
-              ontouchstart="heldButton='forward'"
-              ontouchend="heldButton=null"
-              ontouchcancel="heldButton=null"
-            >
-              ⬆ Forward
-            </button>
-            <button
-              class="joystick-btn btn-left"
-              onmousedown="heldButton = 'left'"
-              onmouseup="heldButton = null"
-              onmouseleave="heldButton = null"
-              ontouchstart="heldButton='left'"
-              ontouchend="heldButton=null"
-              ontouchcancel="heldButton=null"
-            >
-              ⬅ Left
-            </button>
-            <button
-              class="joystick-btn btn-stop"
-              onclick="executeCommand('stop')"
-            >
-              ⏹ Stop
-            </button>
-            <button
-              class="joystick-btn btn-right"
-              onmousedown="heldButton = 'right'"
-              onmouseup="heldButton = null"
-              onmouseleave="heldButton = null"
-              ontouchstart="heldButton='right'"
-              ontouchend="heldButton=null"
-              ontouchcancel="heldButton=null"
-            >
-              Right ➡
-            </button>
-            <button
-              id="btn-backward"
-              class="joystick-btn btn-backward"
-              onmousedown="heldButton = 'backward'"
-              onmouseup="heldButton = null"
-              onmouseleave="heldButton = null"
-              ontouchstart="heldButton='backward'"
-              ontouchend="heldButton=null"
-              ontouchcancel="heldButton=null"
-            >
-              ⬇ Backward
-            </button>
+          <div class="section-title">📹 Pilot View & Manual Control</div>
+          <div class="pilot-view">
+            <!-- Camera Feed on Left -->
+            <div class="camera-feed" id="camera-container">
+              <div class="camera-placeholder">
+                Camera feed loading...<br /><small
+                  >(requires camera configured on Jetson)</small
+                >
+              </div>
+            </div>
+
+            <!-- Controls on Right -->
+            <div class="controls-container">
+              <!-- Speed Slider -->
+              <div
+                style="
+                  padding: 15px;
+                  background: #f8f9fa;
+                  border-radius: 10px;
+                  border: 2px solid #667eea;
+                "
+              >
+                <label
+                  style="
+                    display: block;
+                    margin-bottom: 8px;
+                    font-weight: 600;
+                    color: #555;
+                  "
+                >
+                  Speed:
+                  <span id="speed-value" style="color: #667eea">50</span>%
+                </label>
+                <input
+                  type="range"
+                  id="speed-slider"
+                  min="10"
+                  max="100"
+                  value="50"
+                  oninput="updateSpeed(this.value)"
+                  style="width: 100%; cursor: pointer"
+                />
+              </div>
+
+              <!-- Joystick Controls -->
+              <div class="joystick-grid">
+                <button
+                  class="joystick-btn btn-forward"
+                  onmousedown="heldButton = 'forward'"
+                  onmouseup="heldButton = null"
+                  onmouseleave="heldButton = null"
+                  ontouchstart="heldButton='forward'"
+                  ontouchend="heldButton=null"
+                  ontouchcancel="heldButton=null"
+                >
+                  ⬆ Forward
+                </button>
+                <button
+                  class="joystick-btn btn-left"
+                  onmousedown="heldButton = 'left'"
+                  onmouseup="heldButton = null"
+                  onmouseleave="heldButton = null"
+                  ontouchstart="heldButton='left'"
+                  ontouchend="heldButton=null"
+                  ontouchcancel="heldButton=null"
+                >
+                  ⬅ Left
+                </button>
+                <button
+                  class="joystick-btn btn-stop"
+                  onclick="executeCommand('stop')"
+                >
+                  ⏹ Stop
+                </button>
+                <button
+                  class="joystick-btn btn-right"
+                  onmousedown="heldButton = 'right'"
+                  onmouseup="heldButton = null"
+                  onmouseleave="heldButton = null"
+                  ontouchstart="heldButton='right'"
+                  ontouchend="heldButton=null"
+                  ontouchcancel="heldButton=null"
+                >
+                  Right ➡
+                </button>
+                <button
+                  id="btn-backward"
+                  class="joystick-btn btn-backward"
+                  onmousedown="heldButton = 'backward'"
+                  onmouseup="heldButton = null"
+                  onmouseleave="heldButton = null"
+                  ontouchstart="heldButton='backward'"
+                  ontouchend="heldButton=null"
+                  ontouchcancel="heldButton=null"
+                >
+                  ⬇ Backward
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -778,6 +873,36 @@
       let isArmed = false;
       let isDryRun = false;
       let heldButton = null; // Track which button is held
+
+      // Initialize camera feed
+      function initCameraFeed() {
+        const cameraContainer = document.getElementById('camera-container');
+        if (!cameraContainer) return;
+
+        // Create img element for MJPEG stream
+        const img = document.createElement('img');
+        img.id = 'camera-stream';
+        img.src = '/video_feed';
+        img.alt = 'Camera Feed';
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+
+        // Clear placeholder and add camera
+        cameraContainer.innerHTML = '';
+        cameraContainer.appendChild(img);
+
+        // Handle camera stream errors gracefully
+        img.onerror = () => {
+          cameraContainer.innerHTML =
+            '<div class="camera-placeholder">Camera stream unavailable<br /><small>Check if camera is properly configured</small></div>';
+        };
+      }
+
+      // Initialize camera when page loads
+      window.addEventListener('load', () => {
+        setTimeout(initCameraFeed, 500);
+      });
 
       // Initialize Leaflet map
       let map = null;
