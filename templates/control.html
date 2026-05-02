@@ -439,10 +439,12 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 28px;
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
         position: relative;
         z-index: 1000;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
 
       .boat-marker-arrow {
@@ -452,6 +454,18 @@
         border-right: 10px solid transparent;
         border-bottom: 18px solid white;
         filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+        flex-shrink: 0;
+      }
+
+      /* Override Leaflet marker wrapper defaults */
+      .boat-marker-wrapper {
+        background: transparent !important;
+        border: none !important;
+        width: 50px !important;
+        height: 50px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
       }
     </style>
   </head>
@@ -798,11 +812,11 @@
 
           // Create boat marker
           const boatIcon = L.divIcon({
-            className: 'boat-marker',
-            html: '<div class="boat-marker-arrow"></div>',
+            className: 'boat-marker-wrapper',
+            html: '<div class="boat-marker"><div class="boat-marker-arrow"></div></div>',
             iconSize: [50, 50],
             iconAnchor: [25, 25],
-            popupAnchor: [0, -25],
+            popupAnchor: [0, -35],
           });
 
           boatMarker = L.marker([37.7749, -122.4194], { icon: boatIcon }).addTo(
@@ -837,9 +851,13 @@
             // Rotate marker based on heading
             const markerElement = boatMarker.getElement();
             if (markerElement) {
-              markerElement.style.transition = 'transform 0.3s ease-out';
-              markerElement.style.transformOrigin = 'center center';
-              markerElement.style.transform = `rotate(${heading}deg)`;
+              // Target the inner boat-marker div for rotation
+              const boatDiv = markerElement.querySelector('.boat-marker');
+              if (boatDiv) {
+                boatDiv.style.transition = 'transform 0.3s ease-out';
+                boatDiv.style.transformOrigin = 'center center';
+                boatDiv.style.transform = `rotate(${heading}deg)`;
+              }
             }
           }
 
