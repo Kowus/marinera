@@ -561,7 +561,7 @@
         </div>
       </div>
 
-      <div class="section">
+      <div class="section" style="display: none;">
         <div class="section-title">📍 Boat Location Map</div>
         <div id="map"></div>
       </div>
@@ -668,6 +668,12 @@
       function updateSpeed(value) {
         currentSpeed = parseInt(value);
         document.getElementById('speed-value').textContent = currentSpeed + '%';
+        
+        // Live update: if button is held and system armed, send updated command
+        if (heldButton && isArmed) {
+          console.log('[SPEED] Speed updated to ' + currentSpeed + '% while ' + heldButton + ' held');
+          executeCommand(heldButton);
+        }
       }
 
       function armSystem() {
@@ -864,14 +870,6 @@
           })
           .catch((error) => console.error('[MAP] Error updating map:', error));
       };
-
-      // Speed slider live update: when slider changes and button is held, send updated command
-      document.getElementById('speed-slider').addEventListener('input', function(e) {
-        if (heldButton && isArmed) {
-          console.log('[SPEED UPDATE] Button held while speed changed to ' + e.target.value + '%');
-          executeCommand(heldButton);
-        }
-      });
     </script>
   </body>
 </html>
