@@ -416,7 +416,8 @@ def get_status():
         'mode': mode,
         'speed': speed,
         'enabled': enabled,
-        'dry_run': dry_run
+        'dry_run': dry_run,
+        'enable_reversal': ENABLE_REVERSAL
     })
 
 @app.route('/api/command', methods=['POST'])

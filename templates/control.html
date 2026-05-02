@@ -371,6 +371,11 @@
         font-size: 24px;
         filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
       }
+
+      .boat-arrow {
+        display: inline-block;
+        transition: transform 0.3s ease;
+      }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   </head>
@@ -489,6 +494,7 @@
               Right ➡
             </button>
             <button
+              id="btn-backward"
               class="joystick-btn btn-backward"
               onmousedown="heldButton = 'backward'"
               onmouseup="heldButton = null"
@@ -767,6 +773,7 @@
       let map = null;
       let boatMarker = null;
       let boatHeading = 0;
+      let mapInitialized = false;
 
       // Load Leaflet library and initialize map
       const leafletScript = document.createElement('script');
@@ -787,15 +794,16 @@
           minZoom: 2
         }).addTo(map);
 
-        // Create custom boat marker with arrow
+        // Create custom boat marker
         const boatIcon = L.divIcon({
-          html: `<div style="font-size: 24px; transform: rotate(${boatHeading}deg); transition: transform 0.3s ease;">⛵</div>`,
+          html: `<div class="boat-arrow" style="transform: rotate(${boatHeading}deg);">⛵</div>`,
           className: 'boat-marker',
           iconSize: [32, 32],
           iconAnchor: [16, 16]
         });
 
         boatMarker = L.marker([0, 0], { icon: boatIcon }).addTo(map);
+        mapInitialized = true;
         console.log('[MAP] Leaflet map initialized');
       }
 
@@ -826,19 +834,44 @@
         }
       }
 
-      // Hook into existing updateStatus to also update map
+      // Hook also update map and check reversal setting
       const originalUpdateStatus = updateStatus;
+      let enableReversal = true;
       updateStatus = function() {
         originalUpdateStatus();
 
-        // Also update map after status loads
+        // Also update map after status UI updates
         fetch('/api/status')
           .then((response) => response.json())
           .then((data) => {
+            console.log('[MAP] Updating with lat=' + data.gps.latitude + ', lon=' + data.gps.longitude + ', heading=' + data.heading);
             updateMap(data.gps.latitude, data.gps.longitude, data.heading);
+            
+            // Check reversal capability and disable backward button if needed
+            enableReversal = data.enable_reversal;
+            const backwardBtn = document.getElementById('btn-backward');
+            if (backwardBtn) {
+              if (!enableReversal) {
+                backwardBtn.disabled = true;
+                backwardBtn.style.opacity = '0.5';
+                backwardBtn.style.cursor = 'not-allowed';
+              } else {
+                backwardBtn.disabled = false;
+                backwardBtn.style.opacity = '1';
+                backwardBtn.style.cursor = 'pointer';
+              }
+            }
           })
           .catch((error) => console.error('[MAP] Error updating map:', error));
       };
+
+      // Speed slider live update: when slider changes and button is held, send updated command
+      document.getElementById('speed-slider').addEventListener('input', function(e) {
+        if (heldButton && isArmed) {
+          console.log('[SPEED UPDATE] Button held while speed changed to ' + e.target.value + '%');
+          executeCommand(heldButton);
+        }
+      });
     </script>
   </body>
 </html>
