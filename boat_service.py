@@ -10,7 +10,7 @@ import csv
 import math
 import threading
 from datetime import datetime
-from threading import Thread, Lock
+from threading import Thread, Lock, Condition
 from flask import Flask, render_template, jsonify, request
 from queue import Queue
 import numpy as np
@@ -120,6 +120,7 @@ motor_serial = None
 camera = None
 camera_lock = Lock()
 camera_frame = None
+camera_frame_ready = Condition(camera_lock)  # Signal when new frame arrives
 
 # ============================================================================
 # Motor Command Sender
@@ -560,29 +561,31 @@ def generate_placeholder_frame():
     return base64.b64decode(placeholder_jpeg)
 
 def generate_frames():
-    """Generate MJPEG frames from camera for web streaming (send immediately, no artificial delay)"""
+    """Generate MJPEG frames from camera for web streaming (wait for new frames, no busy-wait)"""
     global camera_frame
     
-    last_frame_id = None  # Track last frame sent to skip duplicates
+    last_frame_id = None
     
     while True:
         try:
-            with camera_lock:
+            with camera_frame_ready:
+                # Wait for new frame signal (timeout prevents infinite wait if camera dies)
+                camera_frame_ready.wait(timeout=1.0)
+                
                 if camera_frame is None:
-                    # Use placeholder when no camera
                     frame_bytes = generate_placeholder_frame()
                 else:
-                    # Camera_frame is already JPEG-encoded by GStreamer
                     frame_bytes = camera_frame
+                
+                frame_id = id(frame_bytes)
+                
+                # Skip if it's the same frame object (no new data since last yield)
+                if frame_id == last_frame_id:
+                    continue
+                
+                last_frame_id = frame_id
             
-            # Skip if it's the same frame object (no new data from GStreamer)
-            frame_id = id(frame_bytes)
-            if frame_id == last_frame_id:
-                continue
-            
-            last_frame_id = frame_id
-            
-            # Send frame immediately - no artificial delay
+            # Send frame immediately - outside lock
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n'
                    b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
@@ -590,7 +593,7 @@ def generate_frames():
             
         except Exception as e:
             print(f"[CAMERA] Frame generation error: {e}")
-            time.sleep(0.01)  # Minimal sleep on error only
+            time.sleep(0.01)
 
 @app.route('/video_feed')
 def video_feed():
@@ -653,8 +656,9 @@ def camera_reader_thread():
                 if result:
                     jpeg_data = bytes(mapinfo.data)
                     
-                    with camera_lock:
+                    with camera_frame_ready:
                         camera_frame = jpeg_data
+                        camera_frame_ready.notify_all()  # Signal that new frame is ready
                     
                     buf.unmap(mapinfo)
             
