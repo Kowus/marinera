@@ -6,6 +6,8 @@ Servo rightThruster;
 
 const int LEFT_PIN = 9;
 const int RIGHT_PIN = 10;
+const int VORTEX_PIN0 = 5;
+const int VORTEX_PIN1 = 7;
 const int STOP = 1000;
 const int HALF_FORWARD = 1500;
 const int FULL_FORWARD = 2000;
@@ -16,18 +18,23 @@ String commandBuffer = "";
 void setup()
 {
   Serial.begin(115200); // Fast USB baud rate
-
+  pinMode(VORTEX_PIN0, OUTPUT);
+  pinMode(VORTEX_PIN1, OUTPUT);
   leftThruster.attach(LEFT_PIN);
   rightThruster.attach(RIGHT_PIN);
 
   leftThruster.writeMicroseconds(STOP);
   rightThruster.writeMicroseconds(STOP);
+  digitalWrite(VORTEX_PIN0, LOW);
+  digitalWrite(VORTEX_PIN1, LOW);
   delay(1000);
   Serial.println("\nBoat controller ready - send commands:");
   Serial.println("M0 + PWM (e.g., M02000=forward)");
   Serial.println("M1 + PWM (e.g., M12000=backward)");
   Serial.println("T0 + PWM (e.g., T01500=turn left)");
   Serial.println("T1 + PWM (e.g., T11500=turn right)");
+  Serial.println("V1 = vortex ON  (e.g., V100000)");
+  Serial.println("V0 = vortex OFF (e.g., V000000)");
   Serial.println("S00000 = stop");
   delay(300);
 }
@@ -107,6 +114,19 @@ void processCommand(String command)
     Serial.println("Resetting...");
     boardReset();
   }
+  else if (cmd == 'V')
+  {
+    if (dir == '1')
+    {
+      vortexOn();
+      Serial.println("Vortex: ON");
+    }
+    else if (dir == '0')
+    {
+      vortexOff();
+      Serial.println("Vortex: OFF");
+    }
+  }
 }
 
 void setMotorForward(int pwm)
@@ -145,4 +165,16 @@ void stop()
 {
   leftThruster.writeMicroseconds(STOP);
   rightThruster.writeMicroseconds(STOP);
+}
+
+void vortexOn()
+{
+  digitalWrite(VORTEX_PIN0, HIGH);
+  digitalWrite(VORTEX_PIN1, HIGH);
+}
+
+void vortexOff()
+{
+  digitalWrite(VORTEX_PIN0, LOW);
+  digitalWrite(VORTEX_PIN1, LOW);
 }
