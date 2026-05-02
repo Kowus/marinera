@@ -50,7 +50,7 @@ MOTOR_PWM_BASE = 1800        # Base forward command
 CORRECTION_PWM_MIN = 1100    # Min PWM for movement (motors stall below this)
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
-CAMERA_PREVIEW = True        # Enable preview window on connected Jetson display (False if headless)
+CAMERA_PREVIEW = False       # Enable preview window on connected Jetson display (disabled due to pipeline format issues)
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 
@@ -602,36 +602,23 @@ def camera_reader_thread():
         print("[CAMERA] Initializing GStreamer for CSI camera (CAM1)...")
         Gst.init(None)
         
-        # Build GStreamer pipeline:
+        # GStreamer pipeline for Jetson Nano CSI camera with GPU-accelerated JPEG encoding
         # nvarguscamerasrc: CSI camera source → GPU memory (NV12)
-        # nvvidconv: GPU YUV→BGRx, stays in GPU memory  
-        # tee: Split pipeline into two branches:
-        #   1. autovideosink: Preview on connected monitor (if CAMERA_PREVIEW=True)
-        #   2. nvjpegenc: GPU JPEG encoding → appsink for web streaming
+        # nvvidconv: GPU YUV→BGR conversion, stays in GPU memory
+        # nvjpegenc: GPU-accelerated JPEG encoding
+        # appsink: Capture encoded JPEG bytes for web streaming
+        # (Preview disabled due to tee/format negotiation issues)
         
-        if CAMERA_PREVIEW:
-            # With preview: camera → split → (display + jpeg for streaming)
-            pipeline_str = (
-                'nvarguscamerasrc ! '
-                'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
-                'nvvidconv ! '
-                'video/x-raw(memory:NVMM), format=BGRx ! '
-                'tee name=t ! '
-                  'queue ! autovideosink sync=false '
-                't. ! queue ! nvjpegenc ! appsink emit-signals=true name=sink'
-            )
-        else:
-            # Without preview: camera → jpeg for streaming only
-            pipeline_str = (
-                'nvarguscamerasrc ! '
-                'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
-                'nvvidconv ! '
-                'video/x-raw(memory:NVMM), format=BGRx ! '
-                'nvjpegenc ! '
-                'appsink emit-signals=true name=sink'
-            )
+        pipeline_str = (
+            'nvarguscamerasrc ! '
+            'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
+            'nvvidconv ! '
+            'video/x-raw(memory:NVMM), format=BGRx ! '
+            'nvjpegenc ! '
+            'appsink emit-signals=true name=sink'
+        )
         
-        print(f"[CAMERA] Pipeline: {('with preview' if CAMERA_PREVIEW else 'no preview')}")
+        print("[CAMERA] Pipeline: nvarguscamerasrc → nvvidconv → nvjpegenc → appsink")
         
         camera = Gst.parse_launch(pipeline_str)
         if not camera:
