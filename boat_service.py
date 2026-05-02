@@ -16,14 +16,22 @@ from queue import Queue
 import numpy as np
 
 # Try importing GStreamer for CSI camera - graceful fallback if not available
+GSTREAMER_AVAILABLE = False
 try:
     import gi
     gi.require_version('Gst', '1.0')
     from gi.repository import Gst, GLib
     GSTREAMER_AVAILABLE = True
-except ImportError:
-    GSTREAMER_AVAILABLE = False
-    print("[WARNING] GStreamer not available - camera feed will be disabled")
+except (ImportError, OSError, SystemError) as e:
+    # OSError/SystemError catches "Illegal instruction" crashes during import
+    print(f"[WARNING] GStreamer not available ({type(e).__name__}: {e})")
+    print("[WARNING] Camera feed will be disabled")
+    print("[TIP] To fix 'Illegal Instruction' on Jetson Nano 2GB:")
+    print("      1. Run: bash run_boat.sh (disables NEON)")
+    print("      2. Or: sudo apt-get install --reinstall libgstreamer1.0-0")
+    print("      3. Or: Use USB camera instead of CSI (fallback method)")
+    GLib = None
+    Gst = None
 
 # Try importing MPU6050 - graceful fallback if not available
 try:
@@ -538,6 +546,15 @@ def set_dry_run():
 # ============================================================================
 # Video Feed (MJPEG Camera Stream)
 # ============================================================================
+# PLACEHOLDER IMAGE - for when camera is unavailable
+# ============================================================================
+def generate_placeholder_frame():
+    """Generate a simple placeholder JPEG when camera is not available"""
+    import base64
+    # Minimal 1x1 gray JPEG (base64 encoded)
+    placeholder_jpeg = base64.b64encode(b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xfb\xda\xff\xd9').decode()
+    return base64.b64decode(placeholder_jpeg)
+
 def generate_frames():
     """Generate MJPEG frames from camera for web streaming"""
     global camera_frame
@@ -546,12 +563,12 @@ def generate_frames():
         try:
             with camera_lock:
                 if camera_frame is None:
-                    time.sleep(0.033)
-                    continue
-                
-                frame_bytes = camera_frame
+                    # Use placeholder when no camera
+                    frame_bytes = generate_placeholder_frame()
+                else:
+                    # Camera_frame is already JPEG-encoded by GStreamer
+                    frame_bytes = camera_frame
             
-            # Camera_frame is already JPEG-encoded by GStreamer - send directly
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n'
                    b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
@@ -566,9 +583,6 @@ def generate_frames():
 @app.route('/video_feed')
 def video_feed():
     """Stream camera feed as MJPEG"""
-    if not GSTREAMER_AVAILABLE or camera is None:
-        return "Camera not available - check GStreamer installation", 503
-    
     return (__import__('flask').Response(generate_frames(),
                                          mimetype='multipart/x-mixed-replace; boundary=frame'),)
 
@@ -645,6 +659,12 @@ def camera_reader_thread():
         while True:
             time.sleep(1)
             
+    except (OSError, SystemError) as e:
+        # Catch "Illegal Instruction" and other hardware-level errors
+        print(f"[CAMERA] HARDWARE ERROR: {type(e).__name__} - {e}")
+        print("[CAMERA] Camera initialization failed (likely NEON/SIMD incompatibility)")
+        print("[CAMERA] Fallback: Running without camera")
+        print("[CAMERA] Try: bash run_boat.sh (disables NEON optimizations)")
     except Exception as e:
         print(f"[CAMERA] Error: {e}")
         import traceback
