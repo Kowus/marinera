@@ -13,13 +13,24 @@ from datetime import datetime
 from threading import Thread, Lock
 from flask import Flask, render_template, jsonify, request
 from queue import Queue
+import numpy as np
 
-# Try importing OpenCV for camera - graceful fallback if not available
+# Try importing GStreamer for CSI camera - graceful fallback if not available
+try:
+    import gi
+    gi.require_version('Gst', '1.0')
+    from gi.repository import Gst, GLib
+    GSTREAMER_AVAILABLE = True
+except ImportError:
+    GSTREAMER_AVAILABLE = False
+    print("[WARNING] GStreamer not available - camera feed will be disabled")
+
+# Try importing OpenCV for image processing
 try:
     import cv2
-    CAMERA_AVAILABLE = True
+    OPENCV_AVAILABLE = True
 except ImportError:
-    CAMERA_AVAILABLE = False
+    OPENCV_AVAILABLE = False
     print("[WARNING] OpenCV not available - camera feed will be disabled")
 
 # Try importing MPU6050 - graceful fallback if not available
@@ -539,7 +550,7 @@ def generate_frames():
     """Generate MJPEG frames from camera for web streaming"""
     global camera, camera_frame
     
-    if not CAMERA_AVAILABLE or camera is None:
+    if not GSTREAMER_AVAILABLE or not OPENCV_AVAILABLE or camera is None:
         return
     
     while True:
@@ -570,51 +581,102 @@ def generate_frames():
 @app.route('/video_feed')
 def video_feed():
     """Stream camera feed as MJPEG"""
-    if not CAMERA_AVAILABLE or camera is None:
-        return "Camera not available", 503
+    if not GSTREAMER_AVAILABLE or not OPENCV_AVAILABLE or camera is None:
+        return "Camera not available - check GStreamer and OpenCV installation", 503
     
     return (__import__('flask').Response(generate_frames(),
                                          mimetype='multipart/x-mixed-replace; boundary=frame'),)
 
 def camera_reader_thread():
-    """Background thread that continuously reads frames from camera"""
+    """Background thread that continuously reads frames from CSI camera using GStreamer"""
     global camera, camera_frame
     
-    if not CAMERA_AVAILABLE:
-        print("[CAMERA] OpenCV not available - camera disabled")
+    if not GSTREAMER_AVAILABLE or not OPENCV_AVAILABLE:
+        print("[CAMERA] GStreamer or OpenCV not available - camera disabled")
+        if not GSTREAMER_AVAILABLE:
+            print("         Install with: sudo apt install python3-gi python3-gi-cairo gir1.2-gstreamer-1.0")
+        if not OPENCV_AVAILABLE:
+            print("         Install with: pip install opencv-python")
         return
     
     try:
-        print("[CAMERA] Initializing camera (device 0)...")
-        camera = cv2.VideoCapture(0)  # Try /dev/video0
+        print("[CAMERA] Initializing GStreamer for CSI camera (CAM1)...")
+        Gst.init(None)
         
-        if not camera.isOpened():
-            print("[CAMERA] Failed to open camera device 0")
-            camera = None
+        # GStreamer pipeline for Jetson Nano CSI camera
+        # nvarguscamerasrc: Native Jetson camera source
+        # nvvidconv: GPU-accelerated video conversion
+        # videoconvert: Convert to BGR for OpenCV
+        pipeline_str = (
+            'nvarguscamerasrc ! '
+            'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
+            'nvvidconv ! '
+            'video/x-raw, format=BGRx ! '
+            'videoconvert ! '
+            'video/x-raw, format=BGR ! '
+            'appsink emit-signals=true'
+        )
+        
+        camera = Gst.parse_launch(pipeline_str)
+        if not camera:
+            print("[CAMERA] Failed to create GStreamer pipeline")
             return
         
-        # Set camera properties
-        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        camera.set(cv2.CAP_PROP_FPS, 30)
+        appsink = camera.get_by_name('appsink0')
+        if not appsink:
+            print("[CAMERA] Could not find appsink in pipeline")
+            return
         
-        print("[CAMERA] Camera initialized (640x480 @ 30 FPS)")
-        
-        while True:
-            ret, frame = camera.read()
-            if ret:
-                with camera_lock:
-                    camera_frame = frame
-            else:
-                print("[CAMERA] Failed to read frame")
-                time.sleep(0.1)
+        def on_new_sample(sink):
+            """Callback when new frame is available from GStreamer"""
+            global camera_frame
+            sample = sink.emit('pull-sample')
+            if sample:
+                buf = sample.get_buffer()
+                caps = sample.get_caps()
+                struct = caps.get_structure(0)
                 
+                w = struct.get_value('width')
+                h = struct.get_value('height')
+                
+                # Extract frame data
+                result, mapinfo = buf.map(Gst.MapFlags.READ)
+                if result:
+                    frame_data = np.frombuffer(mapinfo.data, dtype=np.uint8)
+                    frame_data = frame_data.reshape((h, w, 3))
+                    
+                    with camera_lock:
+                        camera_frame = frame_data.copy()
+                    
+                    buf.unmap(mapinfo)
+            
+            return Gst.FlowReturn.OK
+        
+        appsink.connect('new-sample', on_new_sample)
+        
+        print("[CAMERA] Camera initialized (640x480 @ 30 FPS via GStreamer)")
+        print("[CAMERA] GStreamer pipeline: nvarguscamerasrc")
+        
+        # Start the pipeline
+        ret = camera.set_state(Gst.State.PLAYING)
+        if ret == Gst.StateChangeReturn.FAILURE:
+            print("[CAMERA] Failed to start GStreamer pipeline")
+            return
+        
+        print("[CAMERA] Pipeline started successfully")
+        
+        # Keep thread alive
+        while True:
+            time.sleep(1)
+            
     except Exception as e:
         print(f"[CAMERA] Error: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         if camera:
-            camera.release()
-            print("[CAMERA] Camera released")
+            camera.set_state(Gst.State.NULL)
+            print("[CAMERA] Camera pipeline stopped")
 
 # ============================================================================
 # Motor Connection Setup
