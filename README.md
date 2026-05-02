@@ -1,3 +1,5 @@
+**Note:** Apologies for the numerous commits to this repository. The device is remote and the only way to test was for my buddy to run `git pull` on their machine, as their network doesn't support SSH or conventional remote work ports. This made the initial project setup and testing process quite involved, resulting in frequent commits during development and debugging.
+
 # Autonomous Boat Controller
 
 ## Overview

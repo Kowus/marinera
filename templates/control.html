@@ -727,6 +727,22 @@
             isArmed = data.enabled;
             isDryRun = data.dry_run;
             updateArmDisplay();
+            
+            // ===== UPDATE SVG COMPASS =====
+            console.log('[COMPASS] Updating from statusAPI: heading=' + data.heading);
+            updateCompass(data.heading, data.gps.latitude, data.gps.longitude);
+            
+            // Check reversal capability and disable backward button if needed
+            const backwardBtn = document.getElementById('btn-backward');
+            if (backwardBtn && data.enable_reversal === false) {
+              backwardBtn.disabled = true;
+              backwardBtn.style.opacity = '0.5';
+              backwardBtn.style.cursor = 'not-allowed';
+            } else if (backwardBtn) {
+              backwardBtn.disabled = false;
+              backwardBtn.style.opacity = '1';
+              backwardBtn.style.cursor = 'pointer';
+            }
           })
           .catch((error) =>
             console.error('[STATUS] Error updating status:', error),
@@ -902,37 +918,8 @@
         }
       }
 
-      // Hook into existing updateStatus to also update compass
-      const originalUpdateStatus = updateStatus;
-      let enableReversal = true;
-      updateStatus = function() {
-        originalUpdateStatus();
 
-        // Also update compass after status loads
-        fetch('/api/status')
-          .then((response) => response.json())
-          .then((data) => {
-            console.log('[COMPASS] Raw API data:', data);
-            console.log('[COMPASS] heading value: ' + data.heading + ' (type: ' + typeof data.heading + ')');
-            updateCompass(data.heading, data.gps.latitude, data.gps.longitude);
-            
-            // Check reversal capability and disable backward button if needed
-            enableReversal = data.enable_reversal;
-            const backwardBtn = document.getElementById('btn-backward');
-            if (backwardBtn) {
-              if (!enableReversal) {
-                backwardBtn.disabled = true;
-                backwardBtn.style.opacity = '0.5';
-                backwardBtn.style.cursor = 'not-allowed';
-              } else {
-                backwardBtn.disabled = false;
-                backwardBtn.style.opacity = '1';
-                backwardBtn.style.cursor = 'pointer';
-              }
-            }
-          })
-          .catch((error) => console.error('[COMPASS] Error updating compass:', error));
-      };
+      // Compass update is now integrated directly into updateStatus() function
     </script>
   </body>
 </html>
