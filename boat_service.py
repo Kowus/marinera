@@ -560,8 +560,10 @@ def generate_placeholder_frame():
     return base64.b64decode(placeholder_jpeg)
 
 def generate_frames():
-    """Generate MJPEG frames from camera for web streaming"""
+    """Generate MJPEG frames from camera for web streaming (send immediately, no artificial delay)"""
     global camera_frame
+    
+    last_frame_id = None  # Track last frame sent to skip duplicates
     
     while True:
         try:
@@ -573,16 +575,22 @@ def generate_frames():
                     # Camera_frame is already JPEG-encoded by GStreamer
                     frame_bytes = camera_frame
             
+            # Skip if it's the same frame object (no new data from GStreamer)
+            frame_id = id(frame_bytes)
+            if frame_id == last_frame_id:
+                continue
+            
+            last_frame_id = frame_id
+            
+            # Send frame immediately - no artificial delay
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n'
                    b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
                    + frame_bytes + b'\r\n')
             
-            time.sleep(0.033)  # ~30 FPS
-            
         except Exception as e:
             print(f"[CAMERA] Frame generation error: {e}")
-            time.sleep(0.1)
+            time.sleep(0.01)  # Minimal sleep on error only
 
 @app.route('/video_feed')
 def video_feed():
