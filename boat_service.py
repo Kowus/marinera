@@ -52,9 +52,9 @@ CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 CAMERA_PREVIEW = False       # Enable preview window on connected Jetson display (disabled due to pipeline format issues)
 JPEG_QUALITY = 40            # JPEG encoding quality (1-100): lower = faster/more latency, higher = better quality
-CAMERA_WIDTH = 1280          # Camera resolution width (CSI native: 1280, 960, 640)
-CAMERA_HEIGHT = 720          # Camera resolution height (CSI native: 720, 540, 480)
-CAMERA_FPS = 30              # Camera framerate (CSI native: 120fps max, tune down for CPU JPEG encoding)
+CAMERA_WIDTH = 640           # Force low resolution to reduce CPU load (1280x720 JPEG encoding too slow on Nano 2GB)
+CAMERA_HEIGHT = 480
+CAMERA_FPS = 30              # Keep at 30fps for stable encoding
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 
@@ -581,6 +581,7 @@ def generate_frames():
             # Skip if it's the same frame object (no new data from GStreamer)
             frame_id = id(frame_bytes)
             if frame_id == last_frame_id:
+                time.sleep(0.001)  # 1ms sleep to prevent busy-spinning, let other threads run
                 continue
             
             last_frame_id = frame_id
@@ -629,7 +630,7 @@ def camera_reader_thread():
             'videoconvert ! '
             'video/x-raw, format=I420 ! '
             f'jpegenc quality={JPEG_QUALITY} ! '
-            'appsink emit-signals=true name=sink'
+            'appsink emit-signals=true max-buffers=1 drop=true sync=false name=sink'
         )
         
         print(f"[CAMERA] Pipeline: {CAMERA_WIDTH}x{CAMERA_HEIGHT} @ {CAMERA_FPS}fps, JPEG quality={JPEG_QUALITY}")
