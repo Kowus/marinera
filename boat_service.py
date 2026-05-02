@@ -10,7 +10,7 @@ import csv
 import math
 import threading
 from datetime import datetime
-from threading import Thread, Lock, Condition
+from threading import Thread, Lock
 from flask import Flask, render_template, jsonify, request
 from queue import Queue
 import numpy as np
@@ -52,6 +52,9 @@ CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 CAMERA_PREVIEW = False       # Enable preview window on connected Jetson display (disabled due to pipeline format issues)
 JPEG_QUALITY = 40            # JPEG encoding quality (1-100): lower = faster/more latency, higher = better quality
+CAMERA_WIDTH = 1280          # Camera resolution width (CSI native: 1280, 960, 640)
+CAMERA_HEIGHT = 720          # Camera resolution height (CSI native: 720, 540, 480)
+CAMERA_FPS = 30              # Camera framerate (CSI native: 120fps max, tune down for CPU JPEG encoding)
 CORRECTION_PWM_MAX = 2000    # Max PWM for turn corrections
 ENABLE_REVERSAL = True       # Set to False if ESC cannot reverse
 
@@ -120,7 +123,6 @@ motor_serial = None
 camera = None
 camera_lock = Lock()
 camera_frame = None
-camera_frame_ready = Condition(camera_lock)  # Signal when new frame arrives
 
 # ============================================================================
 # Motor Command Sender
@@ -561,31 +563,29 @@ def generate_placeholder_frame():
     return base64.b64decode(placeholder_jpeg)
 
 def generate_frames():
-    """Generate MJPEG frames from camera for web streaming (wait for new frames, no busy-wait)"""
+    """Generate MJPEG frames from camera for web streaming (send immediately, no artificial delay)"""
     global camera_frame
     
-    last_frame_id = None
+    last_frame_id = None  # Track last frame sent to skip duplicates
     
     while True:
         try:
-            with camera_frame_ready:
-                # Wait for new frame signal (timeout prevents infinite wait if camera dies)
-                camera_frame_ready.wait(timeout=1.0)
-                
+            with camera_lock:
                 if camera_frame is None:
+                    # Use placeholder when no camera
                     frame_bytes = generate_placeholder_frame()
                 else:
+                    # Camera_frame is already JPEG-encoded by GStreamer
                     frame_bytes = camera_frame
-                
-                frame_id = id(frame_bytes)
-                
-                # Skip if it's the same frame object (no new data since last yield)
-                if frame_id == last_frame_id:
-                    continue
-                
-                last_frame_id = frame_id
             
-            # Send frame immediately - outside lock
+            # Skip if it's the same frame object (no new data from GStreamer)
+            frame_id = id(frame_bytes)
+            if frame_id == last_frame_id:
+                continue
+            
+            last_frame_id = frame_id
+            
+            # Send frame immediately - no artificial delay
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n'
                    b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
@@ -593,7 +593,7 @@ def generate_frames():
             
         except Exception as e:
             print(f"[CAMERA] Frame generation error: {e}")
-            time.sleep(0.01)
+            time.sleep(0.01)  # Minimal sleep on error only
 
 @app.route('/video_feed')
 def video_feed():
@@ -623,7 +623,7 @@ def camera_reader_thread():
         
         pipeline_str = (
             'nvarguscamerasrc ! '
-            'video/x-raw(memory:NVMM), width=640, height=480, framerate=30/1 ! '
+            f'video/x-raw(memory:NVMM), width={CAMERA_WIDTH}, height={CAMERA_HEIGHT}, framerate={CAMERA_FPS}/1 ! '
             'nvvidconv ! '
             'video/x-raw, format=BGRx ! '
             'videoconvert ! '
@@ -632,7 +632,7 @@ def camera_reader_thread():
             'appsink emit-signals=true name=sink'
         )
         
-        print("[CAMERA] Pipeline: nvarguscamerasrc → nvvidconv → videoconvert → jpegenc → appsink")
+        print(f"[CAMERA] Pipeline: {CAMERA_WIDTH}x{CAMERA_HEIGHT} @ {CAMERA_FPS}fps, JPEG quality={JPEG_QUALITY}")
         
         camera = Gst.parse_launch(pipeline_str)
         if not camera:
@@ -656,9 +656,8 @@ def camera_reader_thread():
                 if result:
                     jpeg_data = bytes(mapinfo.data)
                     
-                    with camera_frame_ready:
+                    with camera_lock:
                         camera_frame = jpeg_data
-                        camera_frame_ready.notify_all()  # Signal that new frame is ready
                     
                     buf.unmap(mapinfo)
             
