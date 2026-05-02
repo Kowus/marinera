@@ -122,10 +122,20 @@ When `ENABLE_REVERSAL = False`:
 
 ### Requirements
 
+**Python packages:**
+
 ```bash
-python3
 pip install -r requirements.txt
 ```
+
+**System-level dependencies (Jetson Nano):**
+
+```bash
+sudo apt update
+sudo apt install python3-gi python3-gi-cairo gir1.2-gstreamer-1.0
+```
+
+These are required for GStreamer CSI camera support (CAM1/CAM2 ports).
 
 ### On Jetson Nano
 
@@ -147,6 +157,7 @@ Update `GPS_PORT` and `MOTOR_PORT` in `boat_service.py` if your system differs.
 ```bash
 cd ~/boat_control
 pip install -r requirements.txt
+sudo apt install python3-gi python3-gi-cairo gir1.2-gstreamer-1.0  # For camera support
 python3 boat_service.py
 ```
 
