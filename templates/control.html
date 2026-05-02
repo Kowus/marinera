@@ -598,32 +598,54 @@
         <div id="compass-container">
           <svg id="compass" viewBox="0 0 300 300">
             <!-- Background circle -->
-            <circle cx="150" cy="150" r="145" class="compass-background"/>
-            
+            <circle cx="150" cy="150" r="145" class="compass-background" />
+
             <!-- Compass rose rings -->
-            <circle cx="150" cy="150" r="130" fill="none" stroke="#e0e0e0" stroke-width="1"/>
-            <circle cx="150" cy="150" r="115" fill="none" stroke="#f0f0f0" stroke-width="1"/>
-            
+            <circle
+              cx="150"
+              cy="150"
+              r="130"
+              fill="none"
+              stroke="#e0e0e0"
+              stroke-width="1"
+            />
+            <circle
+              cx="150"
+              cy="150"
+              r="115"
+              fill="none"
+              stroke="#f0f0f0"
+              stroke-width="1"
+            />
+
             <!-- Degree markers (every 10 degrees) -->
             <g id="degree-markers" stroke="#ddd" stroke-width="1">
-              <line x1="150" y1="25" x2="150" y2="35"/>
-              <line x1="150" y1="265" x2="150" y2="275"/>
-              <line x1="25" y1="150" x2="35" y2="150"/>
-              <line x1="265" y1="150" x2="275" y2="150"/>
+              <line x1="150" y1="25" x2="150" y2="35" />
+              <line x1="150" y1="265" x2="150" y2="275" />
+              <line x1="25" y1="150" x2="35" y2="150" />
+              <line x1="265" y1="150" x2="275" y2="150" />
             </g>
-            
+
             <!-- Cardinal directions -->
             <text x="150" y="45" class="compass-cardinal">N</text>
             <text x="150" y="270" class="compass-cardinal">S</text>
             <text x="265" y="155" class="compass-cardinal">E</text>
             <text x="35" y="155" class="compass-cardinal">W</text>
-            
+
             <!-- Intercardinal directions -->
-            <text x="225" y="70" class="compass-cardinal" font-size="16">NE</text>
-            <text x="230" y="235" class="compass-cardinal" font-size="16">SE</text>
-            <text x="70" y="70" class="compass-cardinal" font-size="16">NW</text>
-            <text x="65" y="235" class="compass-cardinal" font-size="16">SW</text>
-            
+            <text x="225" y="70" class="compass-cardinal" font-size="16">
+              NE
+            </text>
+            <text x="230" y="235" class="compass-cardinal" font-size="16">
+              SE
+            </text>
+            <text x="70" y="70" class="compass-cardinal" font-size="16">
+              NW
+            </text>
+            <text x="65" y="235" class="compass-cardinal" font-size="16">
+              SW
+            </text>
+
             <!-- Degree numbers (every 30 degrees) -->
             <text x="150" y="50" class="compass-degree">0°</text>
             <text x="200" y="65" class="compass-degree">30°</text>
@@ -637,22 +659,49 @@
             <text x="45" y="150" class="compass-degree">270°</text>
             <text x="65" y="105" class="compass-degree">300°</text>
             <text x="100" y="65" class="compass-degree">330°</text>
-            
+
             <!-- Boat heading needle -->
             <g id="compass-needle" class="compass-needle">
               <!-- Needle shaft -->
-              <line x1="150" y1="150" x2="150" y2="60" stroke="#ff4444" stroke-width="3" stroke-linecap="round"/>
-              <line x1="150" y1="150" x2="150" y2="240" stroke="#ff4444" stroke-width="2" stroke-opacity="0.3" stroke-linecap="round"/>
+              <line
+                x1="150"
+                y1="150"
+                x2="150"
+                y2="60"
+                stroke="#ff4444"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <line
+                x1="150"
+                y1="150"
+                x2="150"
+                y2="240"
+                stroke="#ff4444"
+                stroke-width="2"
+                stroke-opacity="0.3"
+                stroke-linecap="round"
+              />
               <!-- Needle head -->
-              <polygon points="150,50 145,65 155,65" fill="#ff4444"/>
+              <polygon points="150,50 145,65 155,65" fill="#ff4444" />
             </g>
-            
+
             <!-- Center circle -->
-            <circle cx="150" cy="150" r="12" class="compass-center"/>
-            
+            <circle cx="150" cy="150" r="12" class="compass-center" />
+
             <!-- Info display -->
-            <text x="150" y="148" class="compass-info" id="compass-heading">0°</text>
-            <text x="150" y="165" class="compass-info" id="compass-coords" font-size="10">0.0000, 0.0000</text>
+            <text x="150" y="148" class="compass-info" id="compass-heading">
+              0°
+            </text>
+            <text
+              x="150"
+              y="165"
+              class="compass-info"
+              id="compass-coords"
+              font-size="10"
+            >
+              0.0000, 0.0000
+            </text>
           </svg>
         </div>
       </div>
@@ -727,11 +776,13 @@
             isArmed = data.enabled;
             isDryRun = data.dry_run;
             updateArmDisplay();
-            
+
             // ===== UPDATE SVG COMPASS =====
-            console.log('[COMPASS] Updating from statusAPI: heading=' + data.heading);
+            console.log(
+              '[COMPASS] Updating from statusAPI: heading=' + data.heading,
+            );
             updateCompass(data.heading, data.gps.latitude, data.gps.longitude);
-            
+
             // Check reversal capability and disable backward button if needed
             const backwardBtn = document.getElementById('btn-backward');
             if (backwardBtn && data.enable_reversal === false) {
@@ -775,10 +826,16 @@
       function updateSpeed(value) {
         currentSpeed = parseInt(value);
         document.getElementById('speed-value').textContent = currentSpeed + '%';
-        
+
         // Live update: if button is held and system armed, send updated command
         if (heldButton && isArmed) {
-          console.log('[SPEED] Speed updated to ' + currentSpeed + '% while ' + heldButton + ' held');
+          console.log(
+            '[SPEED] Speed updated to ' +
+              currentSpeed +
+              '% while ' +
+              heldButton +
+              ' held',
+          );
           executeCommand(heldButton);
         }
       }
@@ -888,9 +945,17 @@
         heading = Number(heading) || 0;
         lat = Number(lat) || 0;
         lon = Number(lon) || 0;
-        
-        console.log('[COMPASS] heading=' + heading + ' (type: ' + typeof heading + ', isNaN: ' + isNaN(heading) + ')');
-        
+
+        console.log(
+          '[COMPASS] heading=' +
+            heading +
+            ' (type: ' +
+            typeof heading +
+            ', isNaN: ' +
+            isNaN(heading) +
+            ')',
+        );
+
         // Update needle rotation
         const needle = document.getElementById('compass-needle');
         console.log('[COMPASS] needle element:', needle);
@@ -898,26 +963,35 @@
           const rotateValue = `rotate(${heading}deg)`;
           console.log('[COMPASS] Applying transform: ' + rotateValue);
           needle.style.transform = rotateValue;
-          console.log('[COMPASS] Transform applied. Current style:', needle.style.transform);
+          console.log(
+            '[COMPASS] Transform applied. Current style:',
+            needle.style.transform,
+          );
         } else {
           console.error('[COMPASS] ERROR: compass-needle element not found!');
         }
-        
+
         // Update heading text
         const headingText = document.getElementById('compass-heading');
         if (headingText) {
           headingText.textContent = heading.toFixed(1) + '°';
-          console.log('[COMPASS] Heading text updated to: ' + heading.toFixed(1) + '°');
+          console.log(
+            '[COMPASS] Heading text updated to: ' + heading.toFixed(1) + '°',
+          );
         }
-        
+
         // Update coordinates display
         const coordsText = document.getElementById('compass-coords');
         if (coordsText) {
           coordsText.textContent = lat.toFixed(4) + ', ' + lon.toFixed(4);
-          console.log('[COMPASS] Coords updated to: ' + lat.toFixed(4) + ', ' + lon.toFixed(4));
+          console.log(
+            '[COMPASS] Coords updated to: ' +
+              lat.toFixed(4) +
+              ', ' +
+              lon.toFixed(4),
+          );
         }
       }
-
 
       // Compass update is now integrated directly into updateStatus() function
     </script>
