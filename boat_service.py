@@ -432,14 +432,15 @@ def send_command():
     if not action:
         return jsonify({'status': 'error', 'message': 'Missing action parameter'}), 400
     
-    # Clamp speed to valid range
-    speed = max(0, min(100, int(speed)))
+    # Clamp speed to valid range (slider is 10-100%)
+    speed = max(10, min(100, int(speed)))
     
     with state_lock:
         control_state['speed'] = speed
     
-    # Map speed (0-100) to PWM range
-    pwm = int(CORRECTION_PWM_MIN + (speed / 100.0) * (CORRECTION_PWM_MAX - CORRECTION_PWM_MIN))
+    # Map speed (10-100%) to PWM range (1100-2000)
+    # At 10%: 1100 PWM (tested minimum), at 100%: 2000 PWM (maximum)
+    pwm = int(CORRECTION_PWM_MIN + (speed - 10) / 90.0 * (CORRECTION_PWM_MAX - CORRECTION_PWM_MIN))
     pwm = max(CORRECTION_PWM_MIN, min(CORRECTION_PWM_MAX, pwm))
     
     command = None

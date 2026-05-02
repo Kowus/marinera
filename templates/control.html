@@ -407,15 +407,25 @@
             <input
               type="range"
               id="speed-slider"
-              min="0"
+              min="10"
               max="100"
               value="50"
               oninput="updateSpeed(this.value)"
             />
           </div>
 
-          <div class="mode-toggle" style="margin-top: 20px;">
-            <button class="mode-btn" id="dry-run-btn" onclick="toggleDryRun()" style="background: #ffc107; border-color: #ffc107; color: #333; font-weight: 600;">
+          <div class="mode-toggle" style="margin-top: 20px">
+            <button
+              class="mode-btn"
+              id="dry-run-btn"
+              onclick="toggleDryRun()"
+              style="
+                background: #ffc107;
+                border-color: #ffc107;
+                color: #333;
+                font-weight: 600;
+              "
+            >
               🧪 Dry Run: OFF
             </button>
           </div>
@@ -427,9 +437,9 @@
           <div class="joystick-grid">
             <button
               class="joystick-btn btn-forward"
-              onmousedown="heldButton='forward'"
-              onmouseup="heldButton=null"
-              onmouseleave="heldButton=null"
+              onmousedown="heldButton = 'forward'"
+              onmouseup="heldButton = null"
+              onmouseleave="heldButton = null"
               ontouchstart="heldButton='forward'"
               ontouchend="heldButton=null"
               ontouchcancel="heldButton=null"
@@ -438,9 +448,9 @@
             </button>
             <button
               class="joystick-btn btn-left"
-              onmousedown="heldButton='left'"
-              onmouseup="heldButton=null"
-              onmouseleave="heldButton=null"
+              onmousedown="heldButton = 'left'"
+              onmouseup="heldButton = null"
+              onmouseleave="heldButton = null"
               ontouchstart="heldButton='left'"
               ontouchend="heldButton=null"
               ontouchcancel="heldButton=null"
@@ -455,9 +465,9 @@
             </button>
             <button
               class="joystick-btn btn-right"
-              onmousedown="heldButton='right'"
-              onmouseup="heldButton=null"
-              onmouseleave="heldButton=null"
+              onmousedown="heldButton = 'right'"
+              onmouseup="heldButton = null"
+              onmouseleave="heldButton = null"
               ontouchstart="heldButton='right'"
               ontouchend="heldButton=null"
               ontouchcancel="heldButton=null"
@@ -466,9 +476,9 @@
             </button>
             <button
               class="joystick-btn btn-backward"
-              onmousedown="heldButton='backward'"
-              onmouseup="heldButton=null"
-              onmouseleave="heldButton=null"
+              onmousedown="heldButton = 'backward'"
+              onmouseup="heldButton = null"
+              onmouseleave="heldButton = null"
               ontouchstart="heldButton='backward'"
               ontouchend="heldButton=null"
               ontouchcancel="heldButton=null"
@@ -539,7 +549,7 @@
       let currentSpeed = 50;
       let isArmed = false;
       let isDryRun = false;
-      let heldButton = null;  // Track which button is held
+      let heldButton = null; // Track which button is held
 
       // Update status every 500ms
       setInterval(updateStatus, 500);
@@ -550,12 +560,14 @@
           console.log(`[HOLD] Button held: ${heldButton} | Sending command...`);
           executeCommand(heldButton);
         }
-      }, 100);  // Send every 100ms while held (10 Hz)
+      }, 100); // Send every 100ms while held (10 Hz)
 
       // Detect button release (including when mouse leaves button or touch ends)
       const handleButtonRelease = () => {
         if (heldButton) {
-          console.log(`[RELEASE] Button was held: ${heldButton} | Sending STOP...`);
+          console.log(
+            `[RELEASE] Button was held: ${heldButton} | Sending STOP...`,
+          );
           heldButton = null;
           if (isArmed) {
             executeCommand('stop');
@@ -571,8 +583,10 @@
           .then((response) => response.json())
           .then((data) => {
             // Debug: log what status we got back
-            console.log(`[STATUS] motor_command="${data.motor_command}" | enabled=${data.enabled}`);
-            
+            console.log(
+              `[STATUS] motor_command="${data.motor_command}" | enabled=${data.enabled}`,
+            );
+
             // GPS Data
             document.getElementById('gps-lat').textContent =
               data.gps.latitude.toFixed(6);
@@ -598,13 +612,17 @@
             isDryRun = data.dry_run;
             updateArmDisplay();
           })
-          .catch((error) => console.error('[STATUS] Error updating status:', error));
+          .catch((error) =>
+            console.error('[STATUS] Error updating status:', error),
+          );
       }
 
       function executeCommand(action) {
         // Debug: log what we're about to send
-        console.log(`[WEB] Sending: action="${action}" | speed=${currentSpeed}% | armed=${isArmed} | heldButton=${heldButton}`);
-        
+        console.log(
+          `[WEB] Sending: action="${action}" | speed=${currentSpeed}% | armed=${isArmed} | heldButton=${heldButton}`,
+        );
+
         fetch('/api/command', {
           method: 'POST',
           headers: {
@@ -615,9 +633,11 @@
             speed: currentSpeed,
           }),
         })
-          .then(r => r.json())
-          .then(data => console.log(`[WEB] Response:`, data))
-          .catch((error) => console.error('[WEB] Error sending command:', error));
+          .then((r) => r.json())
+          .then((data) => console.log(`[WEB] Response:`, data))
+          .catch((error) =>
+            console.error('[WEB] Error sending command:', error),
+          );
       }
 
       function updateSpeed(value) {
@@ -695,7 +715,7 @@
       function toggleDryRun() {
         isDryRun = !isDryRun;
         const btn = document.getElementById('dry-run-btn');
-        
+
         fetch('/api/dry-run', {
           method: 'POST',
           headers: {
