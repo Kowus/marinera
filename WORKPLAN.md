@@ -164,9 +164,17 @@
 
 **Currently Known Issues:**
 - ❌ Current props severely limit turning authority (impacts autonomous steering)
+  - **Root Cause:** Rush-designed blades capture water sideways instead of cutting through it
+  - Result: More sideways displacement than forward thrust → sluggish steering response
 - Current props sub-optimal for efficiency/speed
 - Motor PWM ranges may need recalibration with new props
 - Steering responsiveness directly limited by propeller performance
+
+**Expected Improvement with New Props:**
+- Proper blade pitch/angle to cut water → efficient thrust vectoring
+- Significantly improved turning authority (3-5x better expected)
+- Heading Hold will respond much faster to steering corrections
+- Waypoint navigation turns will be smooth and quick
 
 **Impact on Autonomous Features:**
 - **Heading Hold:** Will work but may oscillate or respond slowly with current props
